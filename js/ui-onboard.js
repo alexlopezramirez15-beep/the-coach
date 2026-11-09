@@ -130,16 +130,18 @@ ${rows}<p style="margin-top:18px;color:#666">Atributos de 1 a 100. Espacios de f
     </tbody></table></div></section>
     <section class="card"><h3>Actividad de accesos</h3><ul class="log">${S.load().log.filter((l) => ['solicitud', 'acceso', 'alta', 'modelo', 'plantilla'].includes(l.kind)).slice(-40).reverse().map((l) => `<li><time>${UI.fmtDate(l.at)}</time> ${esc(l.text)}</li>`).join('') || '<li class="muted">Sin actividad.</li>'}</ul></section>`;
   };
-  function showCode(u, code, team) {
-    UI.modal(`<h3>Código de acceso de ${esc(u.name)}</h3><p class="muted small">Pásaselo al alumno. Por seguridad sólo se muestra ahora; si se pierde, genera uno nuevo.</p>
+  function showCode(u, code, team, saved) {
+    UI.modal(`<h3>Código de acceso de ${esc(u.name)}</h3>${saved === false ? '<div class="notice warn">Todavía no se ha podido guardar en el servidor (sin conexión). No se lo pases hasta que arriba ponga «Guardado»; si no llega a guardarse, genera uno nuevo.</div>' : ''}<p class="muted small">Pásaselo al alumno. Por seguridad sólo se muestra ahora; si se pierde, genera uno nuevo.</p>
       <div class="bigcode" id="code-val">${esc(code)}</div>${team ? `<p class="small">Equipo asignado: <b>${esc(team.name)}</b></p>` : ''}
       <p class="small">El alumno entra en «Tengo mi código» con <b>${esc(u.email)}</b> y este código.</p>
       <div class="row end"><button class="btn" data-act="copyText" data-t="${esc(code)}">Copiar código</button><button class="btn primary" data-act="closeModal">Hecho</button></div>`);
   }
   A.copyText = (el) => { const t = el.dataset.t; try { navigator.clipboard.writeText(t).then(() => UI.toast('Copiado.'), () => { const r = document.createRange(); r.selectNodeContents(UI.$('#code-val')); getSelection().removeAllRanges(); getSelection().addRange(r); UI.toast('Selecciónalo y cópialo.'); }); } catch (e) { UI.toast('Selecciónalo y cópialo.'); } };
-  A.approve = (el) => { const u = S.users().find((x) => x.id === el.dataset.id); const teamId = UI.$('#ap-' + u.id).value; const code = S.approveStudent(u.id, teamId); UI.render(); showCode(u, code, S.getTeam(teamId)); };
+  // Con servidor: el código sólo se muestra cuando el servidor ha confirmado que lo ha guardado
+  const confirmSaved = async (el) => { if (!(G.TCSync && G.TCSync.remote)) return true; return UI.busy(el, () => G.TCSync.flushNow()); };
+  A.approve = async (el) => { const u = S.users().find((x) => x.id === el.dataset.id); const teamId = UI.$('#ap-' + u.id).value; const code = S.approveStudent(u.id, teamId); const ok = await confirmSaved(el); UI.render(); showCode(u, code, S.getTeam(teamId), ok); };
   A.reject = (el) => { const u = S.users().find((x) => x.id === el.dataset.id); UI.ask('Rechazar solicitud', `Se eliminará la solicitud de ${u.name}.`, 'Rechazar', () => { S.setStudentStatus(u.id, 'rejected'); UI.render(); }, true); };
-  A.regen = (el) => { const u = S.users().find((x) => x.id === el.dataset.id); UI.ask('Generar un código nuevo', `El código anterior de ${u.name} dejará de funcionar.`, 'Generar', () => { const code = S.regenerateCode(u.id); UI.render(); showCode(u, code, S.load().teams.find((t) => t.coachId === u.id)); }); };
+  A.regen = (el) => { const u = S.users().find((x) => x.id === el.dataset.id); UI.ask('Generar un código nuevo', `El código anterior de ${u.name} dejará de funcionar.`, 'Generar', async () => { const code = S.regenerateCode(u.id); const ok = await confirmSaved(null); UI.render(); showCode(u, code, S.load().teams.find((t) => t.coachId === u.id), ok); }); };
   A.toggleStudent = (el) => { S.setStudentStatus(el.dataset.id, el.dataset.s); UI.toast(el.dataset.s === 'revoked' ? 'Acceso desactivado.' : 'Acceso reactivado.'); UI.render(); };
 
   // Vista completa del trabajo de un alumno (incluidos borradores sin entregar)

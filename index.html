@@ -21,7 +21,10 @@ h3{font-size:1.2rem;text-transform:uppercase;letter-spacing:.04em}
 h4{font-size:1rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:.9rem}
 p{margin:0}
 a{color:var(--grass)}
-.muted{color:var(--muted)} .small{font-size:.86rem} .note{font-size:.82rem;color:var(--muted);margin-top:.5rem}
+.muted{color:var(--muted)} .small{font-size:.86rem} .note{font-size:.82rem;color:var(--muted);margin-top:.5rem} .note.bad{color:var(--red)}
+.sync{font-size:.75rem;color:var(--muted);display:inline-flex;align-items:center;gap:.35rem;white-space:nowrap} .sync::before{content:"";width:.5rem;height:.5rem;border-radius:50%;background:var(--grass)} .sync.saving::before{background:var(--amber)} .sync.offline::before,.sync.error::before{background:var(--red)} .sync.offline,.sync.error{color:var(--red)}
+.boot{min-height:100vh;display:grid;place-content:center;justify-items:center;gap:.8rem}
+@media (max-width:640px){.sync{font-size:0;gap:0}}
 .center{text-align:center;justify-content:center}
 table,td,th,.num,.score,.kpi b,.rt,.clock{font-variant-numeric:tabular-nums}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -304,6 +307,8 @@ details.vchk p{margin-top:6px}
 <div id="toasts" aria-live="polite"></div>
 <script src="js/engine.js"></script>
 <script src="js/store.js"></script>
+<script src="js/config.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/demo.js"></script>
 <script src="js/ui-core.js"></script>
 <script src="js/ui-coach.js"></script>

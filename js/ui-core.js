@@ -46,17 +46,24 @@
   UI.actions.askOk = () => { const fn = UI._askFn; UI.closeModal(); if (fn) UI.run(fn); };
   UI.actions.closeModal = () => UI.closeModal();
 
+  const showErr = (e) => { if (e && e.userFacing) UI.toast(e.message, 'bad'); else { console.error(e); UI.toast('Error inesperado: ' + (e && e.message), 'bad'); } };
   UI.run = function (fn) {
-    try { const r = fn(); return r; } catch (e) {
-      if (e && e.userFacing) UI.toast(e.message, 'bad'); else { console.error(e); UI.toast('Error inesperado: ' + (e && e.message), 'bad'); }
-    }
+    try { const r = fn(); if (r && typeof r.then === 'function') r.catch(showErr); return r; } catch (e) { showErr(e); }
   };
+  // Acciones que esperan al servidor: bloquea el botón mientras tanto
+  UI.busy = async function (el, fn) {
+    const btn = el && (el.tagName === 'FORM' ? el.querySelector('button[type=submit],button:not([type])') : el);
+    const txt = btn && btn.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = 'Conectando…'; }
+    try { return await fn(); } finally { if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = txt; } }
+  };
+  const Y = () => G.TCSync && G.TCSync.remote;
 
   /* ───── Navegación ───── */
   const HASHABLE = /^[a-z0-9-]+$/;
   UI.go = function (view, params) {
     UI.state.view = view; UI.state.params = params || {};
-    if (HASHABLE.test(view) && location.hash !== '#' + view) { UI._fromGo = true; try { history.replaceState(null, '', '#' + view); } catch (e) { location.hash = view; } }
+    if (HASHABLE.test(view) && location.hash !== '#' + view) { try { history.replaceState(null, '', '#' + view); } catch (e) { UI._fromGo = true; location.hash = view; } }
     UI.render();
     const main = UI.$('#main'); if (main) main.scrollTop = 0;
     window.scrollTo(0, 0);
@@ -145,7 +152,7 @@
       <header class="topbar">
         <a class="brand" href="#inicio" data-go="${c.user.role === 'teacher' ? 'profe' : 'inicio'}"><span class="logo">TC</span><span class="brand-t"><b>THE COACH</b><small>Manager Academy</small></span></a>
         <div class="ctx">${ctxLabel}${compSwitch}</div>
-        <div class="who"><span class="role ${c.user.superadmin ? 'admin' : c.user.role}">${c.user.superadmin ? 'Superadmin' : c.user.role === 'teacher' ? 'Profesor' : 'Entrenador'}</span><span class="uname">${esc(c.user.name)}</span><button class="btn ghost sm" data-act="switchProfile">Salir</button></div>
+        <div class="who">${G.TCSync ? G.TCSync.statusHtml() : ''}<span class="role ${c.user.superadmin ? 'admin' : c.user.role}">${c.user.superadmin ? 'Superadmin' : c.user.role === 'teacher' ? 'Profesor' : 'Entrenador'}</span><span class="uname">${esc(c.user.name)}</span><button class="btn ghost sm" data-act="switchProfile">Salir</button></div>
       </header>
       <div class="shell ${view === 'espera' ? 'nonav' : ''}">
         ${navHtml ? `<nav class="side" aria-label="Navegación">${navHtml}</nav>` : ''}
@@ -156,13 +163,20 @@
   UI.after = UI.after || {};
   UI.actions.switchComp = (el) => { UI.state.compId = el.value; UI.render(); };
   UI.actions.switchTeam = (el) => { UI.state.teamId = el.value; UI.render(); };
-  UI.actions.switchProfile = () => { UI.stopReplay && UI.stopReplay(); S.logout(); UI.state.view = null; UI.render(); };
+  UI.actions.switchProfile = async () => {
+    UI.stopReplay && UI.stopReplay();
+    if (G.TCSync && G.TCSync.demo) { S.logout(); G.TCSync.leaveDemo(); }
+    else if (Y()) await G.TCSync.logout();
+    else S.logout();
+    UI.state.view = null; UI.state.teamId = null; UI.state.compId = null; UI.render();
+  };
 
   /* ───── Acceso ───── */
   UI.views.login = function () {
-    const hasDemo = S.load().competitions.some((c) => c.demo);
+    const remote = Y();
+    const hasDemo = remote ? G.TCSync.hasLocalDemo() : S.load().competitions.some((c) => c.demo);
     const tab = UI.state.loginTab || 'alumno';
-    const adminExists = S.adminExists();
+    const adminExists = remote ? G.TCSync.adminExists !== false : S.adminExists();
     const tabs = [['alumno', 'Solicitar acceso'], ['codigo', 'Tengo mi código'], ['admin', 'Administrador']];
     let form = '';
     if (tab === 'alumno') form = UI.state.requested
@@ -201,20 +215,22 @@
           <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" class="tab ${k === tab ? 'on' : ''}" data-act="loginTab" data-t="${k}">${l}</button>`).join('')}</div>
           ${form}
         </div>
-        <p class="note">Versión de prueba: los datos se guardan en este navegador. Con el servidor compartido, cada alumno se registrará desde su propio dispositivo.</p>
+        ${remote ? (G.TCSync.online === false ? '<p class="note bad">No se puede conectar con el servidor ahora mismo. Revisa la conexión y recarga la página. La demo sí funciona sin conexión.</p>' : '<p class="note">Servidor compartido: cada alumno entra desde su propio dispositivo y el profesor ve el trabajo de toda la clase. La demo es local y no se mezcla con la clase.</p>')
+          : '<p class="note">Versión local: los datos se guardan en este navegador. Con el servidor compartido, cada alumno se registra desde su propio dispositivo.</p>'}
       </section>
     </div>`;
   };
   UI.actions.loginTab = (el) => { UI.state.loginTab = el.dataset.t; UI.state.requested = false; UI.render(); };
-  UI.actions.requestAccess = (f) => { const d = UI.formData(f); S.requestAccess(d.name, d.email); UI.state.requested = true; UI.render(); };
-  UI.actions.loginCode = (f) => { const d = UI.formData(f); S.loginWithCode(d.email, d.code); UI.state.view = null; UI.state.teamId = null; UI.render(); };
-  UI.actions.adminLogin = (f) => { const d = UI.formData(f); S.adminLogin(d.email, d.password); UI.state.view = 'profe'; UI.state.compId = null; UI.render(); };
-  UI.actions.adminSetup = (f) => { const d = UI.formData(f); S.adminSetup(d.name, d.email, d.password); UI.toast('Superadministrador creado.'); UI.state.view = 'profe'; UI.render(); };
+  UI.actions.requestAccess = (f) => { const d = UI.formData(f); if (Y()) return UI.busy(f, async () => { await G.TCSync.requestAccess(d.name, d.email); UI.state.requested = true; UI.render(); }); S.requestAccess(d.name, d.email); UI.state.requested = true; UI.render(); };
+  UI.actions.loginCode = (f) => { const d = UI.formData(f); const done = () => { UI.state.view = null; UI.state.teamId = null; UI.render(); }; if (Y()) return UI.busy(f, async () => { await G.TCSync.loginStudent(d.email, d.code); done(); }); S.loginWithCode(d.email, d.code); done(); };
+  UI.actions.adminLogin = (f) => { const d = UI.formData(f); const done = () => { UI.state.view = 'profe'; UI.state.compId = null; UI.render(); }; if (Y()) return UI.busy(f, async () => { await G.TCSync.loginAdmin(d.email, d.password); done(); }); S.adminLogin(d.email, d.password); done(); };
+  UI.actions.adminSetup = (f) => { const d = UI.formData(f); const done = () => { UI.toast('Superadministrador creado.'); UI.state.view = 'profe'; UI.render(); }; if (Y()) return UI.busy(f, async () => { await G.TCSync.adminSetup(d.name, d.email, d.password); done(); }); S.adminSetup(d.name, d.email, d.password); done(); };
+  const toDemo = () => { if (G.TCSync && G.TCSync.remote) G.TCSync.enterDemo(); };
   UI.actions.loginAs = (el) => { S.loginAs(el.dataset.id); UI.state.view = null; UI.state.teamId = null; UI.state.compId = null; UI.render(); };
-  function ensureDemo() { let comp = S.load().competitions.find((c) => c.demo); if (!comp) comp = G.TCDemo.createDemo().comp; return comp; }
+  function ensureDemo() { toDemo(); let comp = S.load().competitions.find((c) => c.demo); if (!comp) comp = G.TCDemo.createDemo().comp; return comp; }
   UI.actions.demoCoach = () => { ensureDemo(); const u = S.users().find((x) => x.demo === 'coach'); S.loginAs(u.id); UI.state.teamId = null; UI.go('inicio'); };
   UI.actions.demoTeacher = () => { const comp = ensureDemo(); const u = S.users().find((x) => x.demo === 'teacher'); S.loginAs(u.id); UI.state.compId = comp.id; UI.go('profe'); };
-  UI.actions.demoReset = () => UI.ask('Reiniciar la demo', 'Se borran todos los datos de la liga demo (resultados, entregas y evaluaciones) y se vuelve a crear desde cero.', 'Reiniciar demo', () => { G.TCDemo.createDemo(); S.logout(); UI.toast('Demo reiniciada.'); UI.render(); }, true);
+  UI.actions.demoReset = () => UI.ask('Reiniciar la demo', 'Se borran todos los datos de la liga demo (resultados, entregas y evaluaciones) y se vuelve a crear desde cero.', 'Reiniciar demo', () => { const wasRemote = Y(); toDemo(); G.TCDemo.createDemo(); S.logout(); if (wasRemote) G.TCSync.leaveDemo(); UI.toast('Demo reiniciada.'); UI.render(); }, true);
 
   UI.views.espera = function (c) {
     return `<div class="narrow"><div class="card"><h2>Tu cuenta está activa</h2><p class="muted">Todavía no tienes un equipo asignado. Tu profesor te lo asignará desde el panel de alumnos.</p><button class="btn ghost" data-act="switchProfile">Salir</button></div></div>`;
@@ -223,9 +239,9 @@
   /* ───── Estado del desarrollo ───── */
   UI.views.estado = function () {
     const rows = [
-      ['Fase 1', 'Registro de profesor y alumnos, selección de rol, acceso por código', 'hecho', 'Perfiles locales sin contraseña.'],
+      ['Fase 1', 'Registro del alumno con nombre y email, aprobación y código personal', 'hecho', 'El código se guarda cifrado en el servidor.'],
       ['Fase 1', 'Creación de liga, calendario automático (ida o ida y vuelta) y generación automática', 'hecho', ''],
-      ['Fase 1', 'Asignación de equipos y plantillas equilibradas de 20 jugadores', 'hecho', 'Mismo potencial medio, perfiles distintos.'],
+      ['Fase 1', 'Asignación de equipos y plantillas equilibradas de 18 jugadores', 'hecho', 'Mismo potencial medio, perfiles distintos.'],
       ['Fase 1', 'Modelo de juego por fases y momentos con justificación', 'hecho', ''],
       ['Fase 1', 'Pizarra táctica interactiva (con y sin balón, movimientos, pases, zonas)', 'hecho', ''],
       ['Fase 1', 'Planificador semanal (microciclo) con cargas y evaluación de coherencia', 'hecho', ''],
@@ -248,7 +264,7 @@
       ['Fase 4', 'Niveles de entrenador', 'básico', 'Calculado a partir de la nota académica media.'],
       ['Fase 4', 'Logros, historial de temporadas, palmarés y retos docentes', 'pendiente', ''],
       ['Fase 4', 'Personalización de equipos', 'básico', 'Nombre, siglas y color.'],
-      ['Infra', 'Servidor y base de datos compartida (multiusuario real, permisos en servidor)', 'pendiente', 'Hoy los datos viven en este navegador. La capa de datos está aislada para migrarla.'],
+      ['Infra', 'Servidor y base de datos compartida (multiusuario real, permisos en servidor)', 'hecho', 'Supabase. Cada alumno sólo ve y modifica lo suyo; las entregas quedan bloqueadas en el servidor.'],
       ['Infra', 'Interfaz en catalán', 'pendiente', 'Textos centralizables.'],
     ];
     const cls = { hecho: 'ok', básico: 'info', pendiente: 'pending' };
@@ -258,9 +274,13 @@
     </tbody></table></div></div>`;
   };
 
-  UI.start = function () {
+  UI.start = async function () {
     const v = location.hash.slice(1);
     UI.state.view = v || null;
+    if (G.TCSync && G.TCSync.enabled) {
+      const root = UI.$('#app'); if (root) root.innerHTML = '<div class="boot"><span class="logo">TC</span><p class="muted">Conectando con el servidor…</p></div>';
+      try { await G.TCSync.init(); } catch (e) { console.error(e); }
+    }
     UI.render();
   };
 })(window);

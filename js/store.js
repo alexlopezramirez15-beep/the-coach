@@ -17,14 +17,20 @@
     return { schema: 1, users: [], session: null, competitions: [], teams: [], rounds: [], matches: [], drafts: {}, submissions: [], evaluations: [], reflections: [], log: [] };
   }
   let db = null;
+  // Servidor compartido: si hay un "backend" conectado, los datos viven en memoria y se sincronizan con él.
+  let backend = null;
+  function useBackend(b, initial) { backend = b || null; db = b ? (initial || emptyDb()) : null; mem = null; }
+  const isRemote = () => !!backend;
   function load() {
     if (db) return db;
+    if (backend) { db = emptyDb(); return db; }
     try { const raw = G.localStorage && G.localStorage.getItem(KEY); if (raw) db = JSON.parse(raw); } catch (e) { db = null; }
     if (!db && mem) db = mem;
     if (!db) db = emptyDb();
     return db;
   }
   function save() {
+    if (backend) { backend.changed(); return true; }
     mem = db;
     try { G.localStorage && G.localStorage.setItem(KEY, JSON.stringify(db)); return true; } catch (e) { return false; }
   }
@@ -79,6 +85,8 @@
     if (!u || u.role !== 'teacher' || !u.passHash || u.passHash !== hashCode(password, u.id)) err('Email o contraseña incorrectos.');
     const d = load(); d.session = { userId: u.id, at: now() }; save(); return u;
   }
+  // En local se guarda el hash; con servidor, el código viaja una vez y se cifra allí (bcrypt).
+  function setSecret(u, field, secret) { if (backend) { delete u[field]; backend.secret(u.id, secret); } else u[field] = hashCode(secret, u.id); }
   function assertAdmin() { const u = currentUser(); if (!u || u.role !== 'teacher') err('Sólo el profesor o el superadministrador puede hacerlo.'); return u; }
   // Aprueba la solicitud, asigna equipo y devuelve el código en claro (sólo se muestra una vez; se guarda cifrado).
   function approveStudent(userId, teamId) {
@@ -89,14 +97,14 @@
     if (team.coachId && team.coachId !== u.id) err('Ese equipo ya tiene entrenador.');
     if (d.teams.some((t) => t.compId === comp.id && t.coachId === u.id && t.id !== team.id)) err('Este alumno ya dirige otro equipo de esa competición.');
     const code = randomCode();
-    u.codeHash = hashCode(code, u.id); u.status = 'active'; u.approvedAt = now(); u.approvedBy = admin.id;
+    setSecret(u, 'codeHash', code); u.status = 'active'; u.approvedAt = now(); u.approvedBy = admin.id;
     team.coachId = u.id; team.ai = false;
     addLog(comp.id, team.id, 'alta', `${admin.name} aprueba a ${u.name} y le asigna ${team.name}.`);
     save(); return code;
   }
   function regenerateCode(userId) {
     const admin = assertAdmin(); const u = load().users.find((x) => x.id === userId); if (!u || u.role !== 'student') err('Alumno no encontrado.');
-    const code = randomCode(); u.codeHash = hashCode(code, u.id); if (u.status === 'revoked') u.status = 'active';
+    const code = randomCode(); setSecret(u, 'codeHash', code); if (u.status === 'revoked') u.status = 'active';
     addLog(null, null, 'acceso', `${admin.name} genera un nuevo código para ${u.name}.`); save(); return code;
   }
   function setStudentStatus(userId, status) {
@@ -613,7 +621,7 @@
   function resetAll() { db = emptyDb(); save(); }
 
   G.TCStore = {
-    load, save, uid, now, clone, err,
+    load, save, uid, now, clone, err, useBackend, isRemote, emptyDb,
     currentUser, register, loginAs, logout, users: () => load().users,
     requestAccess, loginWithCode, adminExists, adminSetup, adminLogin, approveStudent, regenerateCode, setStudentStatus, markSquadSeen, submitModel,
     isOwner, canEditTeam,

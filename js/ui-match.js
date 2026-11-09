@@ -117,6 +117,7 @@
 
   /* ───── Visor 2D ───── */
   let RP = null;
+  UI.isReplaying = () => !!(RP && RP.playing);
   UI.stopReplay = () => { if (RP && RP.raf) cancelAnimationFrame(RP.raf); RP = null; };
   function buildFrames(md) {
     // fotogramas: una entrada por paso, con posición del balón en coordenadas de campo (0-100, local ataca a la derecha)

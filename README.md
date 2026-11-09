@@ -14,3 +14,13 @@ Abre `index.html` desde un servidor estático (p. ej. `python3 -m http.server`) 
 
 ## Estado
 Ver la pantalla «Estado del desarrollo» dentro de la app. Fase 1 completa; partes básicas de fases 2–4; pendiente el servidor multiusuario.
+
+## Servidor compartido (Supabase)
+
+- Proyecto Supabase `thecoach` (región eu-west-3). Esquema en `supabase/001_schema.sql` y funciones en `supabase/002_functions.sql`.
+- Los datos se guardan como documentos JSON (`tc_docs`) por colección. Las tablas no se pueden leer ni escribir directamente: todo pasa por funciones RPC (`tc_login`, `tc_pull`, `tc_push`…) que comprueban la sesión y los permisos.
+- Cada alumno sólo descarga lo suyo y lo público de su liga. Sólo puede modificar su modelo, pizarra, tareas, borradores, reflexión y entregas (estas se crean una vez y con la jornada abierta). Los códigos y la contraseña se guardan con bcrypt.
+- Sólo el email configurado en `tc_config.admin_email` puede crear el superadministrador.
+- `js/config.js` contiene la URL y la clave pública. Si se deja vacía, la app vuelve al modo local (este navegador).
+- La demo siempre es local y no toca el servidor.
+- Publicar: `./build.sh` genera `dist/` (HTML completo) para un hosting estático.
