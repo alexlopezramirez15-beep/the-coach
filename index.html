@@ -319,6 +319,9 @@ details.vchk p{margin-top:6px}
 .story h3{margin:1.3rem 0 .4rem;color:var(--ink);font-size:1.05rem}
 .story h3:first-child{margin-top:0}
 .story p{line-height:1.65;margin-bottom:.6rem;font-size:1rem}
+.club-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:stretch}
+.club-grid .story{max-width:none}
+@media (max-width:1000px){.club-grid{grid-template-columns:minmax(0,1fr)}}
 .g-player{grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);align-items:start}
 .g-player .story{max-width:none}
 .player-hero{flex-direction:row;align-items:center;gap:22px;background:linear-gradient(120deg,var(--panel) 55%,var(--panel-2))}

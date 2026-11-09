@@ -19,7 +19,7 @@
   V.club = function (c) {
     const t = c.team; const text = ST.clubHistory(t, c.comp);
     return `<div class="page-head club-head">${ART.crest(t, 96)}<div><div class="eyebrow">Historia del club</div><h1>${esc(t.name)}</h1><p class="muted">Fundado en ${ART.crestSpec(t).founded} · ${ST.words(text).toLocaleString('es-ES')} palabras · Léela antes de analizar a tus jugadores: el club tiene una identidad y unas expectativas.</p></div></div>
-    <article class="card story">${ST.toHtml(text, esc)}</article>`;
+    <div class="club-grid">${text.split('\n\n').map((b) => `<section class="card story">${ST.toHtml(b, esc)}</section>`).join('')}</div>`;
   };
 
   /* ───── Ficha del jugador ───── */
