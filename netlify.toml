@@ -1,5 +1,7 @@
+# Netlify: cada push a main genera dist/ con build.sh y lo publica.
 [build]
-  publish = "."
+  command = "sh build.sh"
+  publish = "dist"
 
 [[headers]]
   for = "/*"
