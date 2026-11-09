@@ -242,9 +242,11 @@
     if (w.ideas.filter((x) => len(x) >= 5).length < 3) out.push('Idea de juego: al menos 3 de las 5 ideas');
     if (len(w.systemText) < 20) out.push('Sistema de juego: explica por qué este sistema (mínimo 20 caracteres)');
     for (const g of Object.values(TC.MODEL_MOMENTS)) for (const [k, l] of g.moments) {
-      const mo = w.moments[k] || {};
+      const items = TC.momentItems(w.moments[k]);
+      const filled = (x) => len(x.fund) || len(x.expl) || (x.players || []).length;
+      const used = items.filter(filled); const check = used.length ? used : [items[0]];
       const miss = [];
-      if (len(mo.fund) < 3) miss.push('fundamento'); if (len(mo.expl) < 30) miss.push('explicación (mín. 30)'); if (!(mo.players || []).length) miss.push('jugadores');
+      check.forEach((mo, j) => { const pre = check.length > 1 ? `nº ${j + 1} ` : ''; if (len(mo.fund) < 3) miss.push(pre + 'fundamento'); if (len(mo.expl) < 30) miss.push(pre + 'explicación (mín. 30)'); if (!(mo.players || []).length) miss.push(pre + 'jugadores'); });
       if (miss.length) out.push(`${l}: ${miss.join(', ')}`);
     }
     return out;

@@ -230,8 +230,14 @@
   };
   const FUNDAMENTOS = ['Fijar para liberar', 'Atraer para progresar', 'Tercer hombre', 'Pared', 'Apoyo y desmarque', 'Amplitud y profundidad', 'Superioridad numérica', 'Superioridad posicional', 'Superioridad cualitativa', 'Cambio de orientación', 'Juego entre líneas', 'Ataque al espacio', 'Desmarque de ruptura', 'Conducción para fijar', 'Llegada de segunda línea', 'Ocupación de carriles', 'Temporizar', 'Basculación', 'Cobertura', 'Permuta', 'Vigilancias', 'Presión tras pérdida', 'Repliegue intensivo', 'Orientar la presión hacia fuera', 'Cerrar líneas de pase interiores', 'Salto a presionar', 'Basculación y cierre del lado fuerte', 'Contraataque', 'Primer pase fuera de zona de presión', 'Ataque rápido'];
   function blankWork() {
-    const moments = {}; for (const g of Object.values(MODEL_MOMENTS)) for (const [k] of g.moments) moments[k] = { fund: '', expl: '', players: [] };
+    const moments = {}; for (const g of Object.values(MODEL_MOMENTS)) for (const [k] of g.moments) moments[k] = { items: [{ fund: '', expl: '', players: [] }] };
     return { lines: { def: '', mid: '', att: '' }, ideas: ['', '', '', '', ''], systemText: '', moments };
+  }
+  // Entradas (fundamento + explicación + jugadores) de un momento; admite el formato antiguo de una sola entrada
+  function momentItems(mo) {
+    if (!mo) return [{ fund: '', expl: '', players: [] }];
+    const items = Array.isArray(mo.items) ? mo.items : [{ fund: mo.fund || '', expl: mo.expl || '', players: mo.players || [] }];
+    return items.length ? items.map((x) => ({ fund: x.fund || '', expl: x.expl || '', players: x.players || [] })) : [{ fund: '', expl: '', players: [] }];
   }
   // Cuaderno de ejemplo (demo y pruebas): usa jugadores reales de la plantilla
   function exampleWork(players) {
@@ -243,7 +249,7 @@
     w.ideas = w.ideas.slice(0, 5);
     w.systemText = 'Jugamos 1-4-3-3 porque tenemos tres buenos medios y dos extremos rápidos que dan amplitud.';
     const pick = { salida: [P[0], D[0], D[1], M[0]], progresion: [M[0], M[1], D[2]], ultimo: [A[0], A[1], M[1]], bloqueAlto: [A[0], A[1], M[1]], bloqueMedio: [M[0], M[1], D[0]], bloqueBajo: [D[0], D[1], M[0]], transOf: [M[1], A[0], A[1]], transDef: [M[0], D[0], D[1]] };
-    for (const [k, ids] of Object.entries(pick)) w.moments[k] = { fund: FUNDAMENTOS[Object.keys(pick).indexOf(k) * 3 % FUNDAMENTOS.length], expl: 'Explicación de ejemplo: qué buscamos en este momento, cómo lo hacemos y por qué encaja con estos jugadores.', players: ids.filter(Boolean) };
+    for (const [k, ids] of Object.entries(pick)) w.moments[k] = { items: [{ fund: FUNDAMENTOS[Object.keys(pick).indexOf(k) * 3 % FUNDAMENTOS.length], expl: 'Explicación de ejemplo: qué buscamos en este momento, cómo lo hacemos y por qué encaja con estos jugadores.', players: ids.filter(Boolean) }] };
     return w;
   }
   function defaultModel() {
@@ -1118,7 +1124,7 @@
     makeRng, hashSeed, clamp, avg, round1,
     ATTR_GROUPS, ALL_ATTRS, ATTR_LABEL, POSITIONS, POS_KEYS, ARCHETYPES, FORMATIONS, ATT_STRUCTURES, INDICATORS, IND_LABEL, IND_START,
     TASK_TYPES, OBJ_PROFILE, PROVOCATIONS, PROV, SESSION_TYPES, DAYS, MODEL_FIELDS, COND_ACTIONS, COND_WHEN, TASK_LIBRARY, DEFAULT_WEIGHTS,
-    defaultModel, exampleWork, modelRelevance, genSquad, playerRating, posFit, squadPotential, strengthsWeaknesses, autoLineup, roundRobin,
+    defaultModel, exampleWork, momentItems, modelRelevance, genSquad, playerRating, posFit, squadPotential, strengthsWeaknesses, autoLineup, roundRobin,
     evaluateTask, evaluateSession, evaluateMicrocycle, computeLearning, evaluatePlan, evaluateCoherence, evaluateAdaptation, evaluateReflection,
     simulateMatch, tacticsFrom, taskPlayers, sessionLoad: load,
     PHASE_SPACES, MODEL_DEMANDS, spaceValue, squadSpaces, validateModel, MODEL_MOMENTS, FUNDAMENTOS, blankWork,

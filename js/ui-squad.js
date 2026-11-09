@@ -111,7 +111,7 @@
   A.openPlayer = (el) => { UI.closeModal(); UI.go('jugador', { id: el.dataset.id }); };
 
   /* ───── Cuaderno del modelo de juego ───── */
-  const workOf = (m) => { const w = Object.assign(TC.blankWork(), (m && m.work) || {}); w.moments = Object.assign(TC.blankWork().moments, w.moments || {}); w.lines = Object.assign({ def: '', mid: '', att: '' }, w.lines || {}); w.ideas = (w.ideas || []).concat(['', '', '', '', '']).slice(0, 5); return w; };
+  const workOf = (m) => { const w = Object.assign(TC.blankWork(), (m && m.work) || {}); w.moments = Object.assign(TC.blankWork().moments, w.moments || {}); w.lines = Object.assign({ def: '', mid: '', att: '' }, w.lines || {}); w.ideas = (w.ideas || []).concat(['', '', '', '', '']).slice(0, 5); for (const k of Object.keys(w.moments)) w.moments[k] = { items: TC.momentItems(w.moments[k]) }; return w; };
   const FIELDS = (key) => Object.fromEntries(Object.entries(TC.MODEL_FIELDS).map(([k, g]) => [k, g.fields]))[key] || [];
   const selects = (fields, m, editable, skip) => `<div class="fields compact">${fields.filter(([f]) => !(skip || []).includes(f)).map(([f, l, opts]) => `<label class="field"><span>${esc(l)}</span><select name="${f}" ${editable ? '' : 'disabled'}>${UI.opts(opts, m[f])}</select></label>`).join('')}</div>`;
   V.modelo = function (c) {
@@ -122,10 +122,12 @@
     const missing = S.modelMissing(Object.assign({}, m, { work: workOf(m) }));
     const dis = editable ? '' : 'disabled';
     const players = sortPlayers(t.players);
-    const moment = (k, label) => { const mo = w.moments[k]; return `<div class="moment"><h4>${esc(label)}</h4>
-      <label class="field"><span>Fundamento de juego</span><input name="w.m.${k}.fund" list="fundamentos" value="${esc(mo.fund)}" placeholder="Ej. Tercer hombre, fijar para liberar…" ${dis}></label>
-      <label class="field"><span>Explicación</span><textarea name="w.m.${k}.expl" rows="3" placeholder="¿Qué queremos que pase y cómo? ¿Por qué con estos jugadores?" ${dis}>${esc(mo.expl)}</textarea></label>
-      <fieldset class="field"><legend>Jugadores principales que intervienen</legend><div class="pick">${players.map((p) => `<label class="pchip"><input type="checkbox" name="w.m.${k}.players" value="${p.id}" ${(mo.players || []).includes(p.id) ? 'checked' : ''} ${dis}><span>${p.pos} ${esc(p.name.split(' ').slice(-1)[0])}</span></label>`).join('')}</div></fieldset></div>`; };
+    const entry = (k, j, mo, n) => `<div class="entry">${n > 1 ? `<div class="entry-h"><b>Fundamento ${j + 1}</b>${editable && j > 0 ? `<button type="button" class="icon" data-act="momentDel" data-k="${k}" data-j="${j}" aria-label="Quitar este fundamento" title="Quitar">×</button>` : ''}</div>` : ''}
+      <label class="field"><span>Fundamento de juego</span><input name="w.m.${k}.${j}.fund" list="fundamentos" value="${esc(mo.fund)}" placeholder="Ej. Tercer hombre, fijar para liberar…" ${dis}></label>
+      <label class="field"><span>Explicación</span><textarea name="w.m.${k}.${j}.expl" rows="3" placeholder="¿Qué queremos que pase y cómo? ¿Por qué con estos jugadores?" ${dis}>${esc(mo.expl)}</textarea></label>
+      <fieldset class="field"><legend>Jugadores principales que intervienen</legend><div class="pick">${players.map((p) => `<label class="pchip"><input type="checkbox" name="w.m.${k}.${j}.players" value="${p.id}" ${(mo.players || []).includes(p.id) ? 'checked' : ''} ${dis}><span>${p.pos} ${esc(p.name.split(' ').slice(-1)[0])}</span></label>`).join('')}</div></fieldset></div>`;
+    const moment = (k, label) => { const items = w.moments[k].items; return `<div class="moment"><h4>${esc(label)}</h4>${items.map((mo, j) => entry(k, j, mo, items.length)).join('')}
+      ${editable ? `<button type="button" class="btn sm ghost add-entry" data-act="momentAdd" data-k="${k}">+ Añadir fundamento</button>` : ''}</div>`; };
     const phase = (key) => { const g = TC.MODEL_MOMENTS[key]; const fields = key === 'ofensiva' ? FIELDS('ofensiva') : key === 'defensiva' ? FIELDS('defensiva') : FIELDS('transAD').concat(FIELDS('transDA'));
       return `<section class="card phase"><h2 class="phase-t">${esc(g.label)}</h2><details class="decisions"><summary>Decisiones tácticas (las usa el simulador)</summary>${selects(fields, m, editable, ['defStructure', 'attStructure'])}</details>${g.moments.map(([k, l]) => moment(k, l)).join('')}</section>`; };
     return `<div class="page-head">${!m.submittedAt ? '<div class="eyebrow">Paso 2 de 2 antes de competir</div>' : ''}<h1>Modelo de juego</h1><p class="muted">Construye tu modelo a partir de la plantilla que te ha tocado. Apóyate en el DAFO de tus jugadores: cada decisión debe poder explicarse con nombres propios.</p></div>
@@ -156,12 +158,15 @@
       if (parts[1] === 'lines') w.lines[parts[2]] = v;
       else if (parts[1] === 'ideas') w.ideas[+parts[2]] = v;
       else if (parts[1] === 'systemText') w.systemText = v;
-      else if (parts[1] === 'm') { const mo = w.moments[parts[2]]; if (parts[3] === 'players') continue; mo[parts[3]] = v; }
+      else if (parts[1] === 'm') { const its = w.moments[parts[2]].items; const j = +parts[3]; while (its.length <= j) its.push({ fund: '', expl: '', players: [] }); if (parts[4] === 'players') continue; its[j][parts[4]] = v; }
     }
-    for (const k of Object.keys(w.moments)) w.moments[k].players = UI.$$(`input[name="w.m.${k}.players"]:checked`, f).map((x) => x.value);
+    for (const k of Object.keys(w.moments)) w.moments[k].items.forEach((it, j) => { it.players = UI.$$(`input[name="w.m.${k}.${j}.players"]:checked`, f).map((x) => x.value); });
     out.work = w; return out;
   }
   A.modelLive = () => { const m = readModel(); const box = UI.$('#model-val'); if (!box) return; box.querySelector('#model-missing').innerHTML = missingHtml(S.modelMissing(Object.assign({}, m, { work: workOf(m) }))); const vEl = box.lastElementChild; vEl.outerHTML = UI.validationPanel(TC.validateModel(m, UI.ctx().team.players)); };
+  function keepScroll(fn) { const y = window.scrollY; fn(); UI.render(); window.scrollTo(0, y); }
+  A.momentAdd = (el) => keepScroll(() => { const m = readModel(); m.work.moments[el.dataset.k].items.push({ fund: '', expl: '', players: [] }); S.saveModel(UI.ctx().team.id, m); });
+  A.momentDel = (el) => keepScroll(() => { const m = readModel(); m.work.moments[el.dataset.k].items.splice(+el.dataset.j, 1); S.saveModel(UI.ctx().team.id, m); });
   A.saveModel = () => { S.saveModel(UI.ctx().team.id, readModel()); UI.toast('Borrador del modelo guardado.'); UI.render(); };
   A.presentModel = () => {
     const c = UI.ctx(); const m = readModel(); S.saveModel(c.team.id, m);
@@ -172,7 +177,7 @@
   /* ───── Vista del profesor: DAFO y cuaderno del alumno ───── */
   UI.workSummary = function (t) {
     const w = workOf(t.model); const nb = S.getNotebook(t.id); const pn = (id) => { const p = t.players.find((x) => x.id === id); return p ? p.name : '?'; };
-    const moments = Object.values(TC.MODEL_MOMENTS).map((g) => `<h4>${esc(g.label)}</h4>${g.moments.map(([k, l]) => { const mo = w.moments[k]; return `<p class="small"><b>${esc(l)}</b> · <i>${esc(mo.fund || '—')}</i><br>${esc(mo.expl || '—')}<br><span class="muted">Jugadores: ${esc((mo.players || []).map(pn).join(', ') || '—')}</span></p>`; }).join('')}`).join('');
+    const moments = Object.values(TC.MODEL_MOMENTS).map((g) => `<h4>${esc(g.label)}</h4>${g.moments.map(([k, l]) => `<p class="small"><b>${esc(l)}</b></p>` + w.moments[k].items.map((mo) => `<p class="small entry-sum"><i>${esc(mo.fund || '—')}</i><br>${esc(mo.expl || '—')}<br><span class="muted">Jugadores: ${esc((mo.players || []).map(pn).join(', ') || '—')}</span></p>`).join('')).join('')}`).join('');
     return `<section class="card"><h3>Cuaderno del modelo de juego</h3>
       <h4>Características por líneas</h4><p class="small"><b>Defensa:</b> ${esc(w.lines.def || '—')}<br><b>Medios:</b> ${esc(w.lines.mid || '—')}<br><b>Delanteros:</b> ${esc(w.lines.att || '—')}</p>
       <h4>Idea de juego</h4><ol class="small">${w.ideas.filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join('') || '<li class="muted">—</li>'}</ol>
