@@ -111,13 +111,13 @@
   };
 
   const COACH_NAV = [
-    ['Competición', [['inicio', 'Inicio'], ['partido', 'Centro de partido'], ['clasificacion', 'Clasificación'], ['ranking', 'Ranking de entrenadores'], ['historial', 'Historial']]],
+    ['Competición', [['inicio', 'Inicio'], ['directo', 'Partido en directo'], ['partido', 'Centro de partido'], ['clasificacion', 'Clasificación'], ['ranking', 'Ranking de entrenadores'], ['historial', 'Historial']]],
     ['Mi equipo', [['presentacion', 'Presentación de plantilla'], ['club', 'Historia del club'], ['equipo', 'Mi equipo'], ['plantilla', 'Plantilla'], ['modelo', 'Modelo de juego'], ['pizarra', 'Pizarra táctica']]],
     ['Semana', [['semana', 'Resumen de la semana'], ['rival', 'Rival'], ['scouting', 'Informe del rival'], ['plan', 'Plan de partido'], ['microciclo', 'Microciclo semanal'], ['alineacion', 'Once titular'], ['individual', 'Trabajo individual']]],
     ['Proyecto', [['estado', 'Estado del desarrollo']]],
   ];
   const TEACHER_NAV = [
-    ['Clase', [['profe', 'Panel del profesor'], ['profe-alumnos', 'Alumnos y accesos'], ['profe-jornadas', 'Jornadas'], ['profe-entregas', 'Entregas'], ['profe-evaluar', 'Evaluaciones']]],
+    ['Clase', [['profe', 'Panel del profesor'], ['profe-directo', 'Partido en directo'], ['profe-alumnos', 'Alumnos y accesos'], ['profe-jornadas', 'Jornadas'], ['profe-entregas', 'Entregas'], ['profe-evaluar', 'Evaluaciones']]],
     ['Competición', [['clasificacion', 'Clasificación'], ['ranking', 'Ranking académico'], ['profe-jugadores', 'Jugadores'], ['profe-config', 'Configuración']]],
     ['Proyecto', [['estado', 'Estado del desarrollo']]],
   ];
@@ -172,7 +172,7 @@
       </header>
       <div class="shell ${view === 'espera' ? 'nonav' : ''}">
         ${navHtml ? `<nav class="side" aria-label="Navegación">${navHtml}</nav>` : ''}
-        <main id="main" class="main view-${view}">${body}</main>
+        <main id="main" class="main view-${view}">${UI.liveBanner ? UI.liveBanner(c, view) : ''}${body}</main>
       </div>`;
     if (UI.after[view]) { try { UI.after[view](c, UI.state.params); } catch (e) { console.error(e); } }
   };

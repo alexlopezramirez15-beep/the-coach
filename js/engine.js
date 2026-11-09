@@ -676,7 +676,9 @@
       key, teamId: team.id, name: team.name, short: team.short, color: team.color,
       tactics: tacticsFrom(snap.model, snap.plan), ind: Object.assign({}, snap.indicators),
       onPitch, bench: (lineup.bench || []).map((id) => byId[id]).filter(Boolean),
-      energy: {}, conditions: ((snap.plan && snap.plan.conditions) || []).filter((c) => c.action).map((c) => Object.assign({ fired: false }, c)),
+      energy: {}, conditions: ((snap.plan && snap.plan.conditions) || []).filter((c) => c.action).map((c) => Object.assign({ fired: false }, c))
+        .concat((snap.live || []).filter((l) => l.action).map((l) => ({ fired: false, when: 'siempre', from: l.min, action: l.action, out: l.out, in: l.in, live: true }))),
+      boosts: (snap.live || []).filter((l) => l.amount && l.inds).map((l) => ({ from: l.min, to: l.to || 90, inds: l.inds, amount: l.amount })),
       byId,
     };
     for (const x of onPitch) side.energy[x.p.id] = clamp(100 - (x.p.fatigue || 0) * 0.6, 40, 100);
@@ -762,12 +764,14 @@
     let t = 0, possession = r() < 0.5 ? 'h' : 'a', startZone = 'baja', counterFlag = false;
     const tmod = (side) => ({ pausado: 1.25, medio: 1, alto: 0.8 }[side.tactics.tempo]);
     const indW = W.indicatorWeight, tw = W.tacticWeight;
-    const iv = (side, k) => 50 + (side.ind[k] - 50) * indW; // indicador ponderado
+    let curMin = 1;
+    const boost = (side, k) => (side.boosts || []).reduce((a, b) => a + (curMin >= b.from && curMin <= b.to && b.inds.includes(k) ? b.amount : 0), 0);
+    const iv = (side, k) => 50 + (side.ind[k] + boost(side, k) - 50) * indW; // indicador ponderado (+ efecto de las decisiones en directo)
     const noise = () => r.normal() * 0.04 * W.variance;
 
     while (t < total) {
       const att = sides[possession], def = other(possession);
-      const minute = Math.min(90, Math.floor(t / 60) + 1);
+      const minute = Math.min(90, Math.floor(t / 60) + 1); curMin = minute;
       // instrucciones condicionales
       for (const s of [H, A]) {
         const my = s.key === 'h' ? score[0] - score[1] : score[1] - score[0];

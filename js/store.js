@@ -420,16 +420,11 @@
     s.indicators = clone(team.indicators);
     return s;
   }
-  function playRound(compId) {
-    const comp = getComp(compId); assertOwner(comp);
-    const d = load();
-    const n = comp.currentRound; const rd = roundOf(compId, n);
-    if (!rd || rd.status !== 'open') err('No hay ninguna jornada abierta.');
+  // 1) asegurar entregas (equipos del sistema o sin entrega)
+  function ensureSubmissions(comp, n, alerts) {
     const quality = comp.config.difficulty === 'alto' ? 'avanzado' : comp.config.difficulty === 'bajo' ? 'basico' : 'medio';
-    const ms = matchesOf(compId, n);
-    const alerts = [];
-    // 1) asegurar entregas (equipos del sistema o sin entrega)
-    for (const team of teamsOf(compId)) {
+    const ms = matchesOf(comp.id, n);
+    for (const team of teamsOf(comp.id)) {
       if (!ms.some((m) => m.homeId === team.id || m.awayId === team.id)) continue;
       if (!lastSubmission(team.id, n)) {
         if (team.ai) makeSubmission(team, n, autoWeek(team, n, quality), true);
@@ -440,8 +435,11 @@
         }
       }
     }
-    // 2) aplicar aprendizaje del microciclo y fatiga
-    for (const team of teamsOf(compId)) {
+  }
+  // 2) aplicar aprendizaje del microciclo y fatiga (una sola vez por jornada)
+  function applyLearning(comp, n) {
+    const rd = roundOf(comp.id, n); if (rd.learned) return;
+    for (const team of teamsOf(comp.id)) {
       const sub = lastSubmission(team.id, n); if (!sub) continue;
       const before = clone(team.indicators);
       const microEval = TC.evaluateMicrocycle(sub.snapshot.microcycle, sub.snapshot.model, { sessionsRequired: comp.config.sessionsPerWeek, afterMatch: n > 1 });
@@ -452,20 +450,158 @@
       const wl = sub.evals.micro.fatigueLoad || 0.6;
       for (const p of team.players) p.fatigue = Math.round(TC.clamp(p.fatigue * 0.35 + wl * 14, 0, 100));
     }
+    rd.learned = true;
+  }
+
+  /* ───────── Partido en directo ───────── */
+  const LIVE_SLOTS = [0.18, 0.5, 0.8];
+  function liveWindow(rd) { return Math.max(60, Math.min(180, Math.round(rd.live.halfSec * 0.22))); }
+  function liveClock(rd, t) {
+    const L = rd.live; t = t || Date.now();
+    if (!L) return null;
+    if (L.status === 'h1') { const e = (t - L.h1At) / 1000; return { half: 1, elapsed: e, minute: Math.min(45, 1 + Math.floor((e / L.halfSec) * 45)), left: Math.max(0, L.halfSec - e) }; }
+    if (L.status === 'h2') { const e = (t - L.h2At) / 1000; return { half: 2, elapsed: e, minute: Math.min(90, 46 + Math.floor((e / L.halfSec) * 45)), left: Math.max(0, L.halfSec - e) }; }
+    return { half: L.status === 'ht' ? 1.5 : 3, elapsed: 0, minute: L.status === 'ht' ? 45 : 90, left: 0 };
+  }
+  function liveAnswersOf(rd, teamId) {
+    const team = getTeam(teamId);
+    if (team.ai && !team.coachId) return (rd.live.ai || {})[teamId] || {};
+    const dr = load().drafts[teamId + ':' + rd.number]; return (dr && dr.live) || {};
+  }
+  function liveEffectsFor(rd, team, sub) {
+    const notes = (rd.live && rd.live.notes && rd.live.notes[team.id]) || [];
+    const lu = sub.snapshot.lineup; const byId = Object.fromEntries(team.players.map((p) => [p.id, p]));
+    return TC.LIVE.effects(notes, liveAnswersOf(rd, team.id), lu.slots.map((id) => byId[id]).filter(Boolean), (lu.bench || []).map((id) => byId[id]).filter(Boolean));
+  }
+  function liveInput(comp, rd, m) {
+    const home = getTeam(m.homeId), away = getTeam(m.awayId);
+    const hs = lastSubmission(home.id, rd.number), as = lastSubmission(away.id, rd.number);
+    const hsn = snapshotFor(home, hs), asn = snapshotFor(away, as);
+    if (rd.live) { hsn.live = liveEffectsFor(rd, home, hs); asn.live = liveEffectsFor(rd, away, as); }
+    return { home, away, hs, as, input: { seed: m.seed, minutes: 90, weights: comp.config.weights, home: { team: home, snap: hsn }, away: { team: away, snap: asn } } };
+  }
+  // El superadministrador inicia los partidos: se bloquean las entregas y empieza la primera parte
+  function startLive(compId, halfMin) {
+    const comp = getComp(compId); assertOwner(comp);
+    const n = comp.currentRound; const rd = roundOf(compId, n);
+    if (!rd || rd.status !== 'open') err('La semana tiene que estar abierta para iniciar los partidos.');
+    const alerts = []; ensureSubmissions(comp, n, alerts); applyLearning(comp, n);
+    const r = TC.makeRng('injury:' + comp.seed + ':' + n);
+    const injuries = {}; for (const t of teamsOf(compId)) if (r() < 0.5) injuries[t.id] = 1 + Math.floor(r() * 3);
+    rd.alerts = alerts; rd.status = 'live';
+    rd.live = { status: 'h1', halfSec: Math.round(Math.max(1, +halfMin || 15) * 60), h1At: Date.now(), h2At: null, notes: {}, ai: {}, feed: {}, injuries };
+    addLog(compId, null, 'partido', `Jornada ${n}: empiezan los partidos en directo.`);
+    save(); liveTick(compId); return rd;
+  }
+  function startSecondHalf(compId) {
+    const comp = getComp(compId); assertOwner(comp); const rd = roundOf(compId, comp.currentRound);
+    if (!rd || rd.status !== 'live' || rd.live.status !== 'ht') err('Todavía no es el descanso.');
+    rd.live.status = 'h2'; rd.live.h2At = Date.now(); save(); liveTick(compId); return rd;
+  }
+  function endFirstHalfNow(compId) {
+    const comp = getComp(compId); assertOwner(comp); const rd = roundOf(compId, comp.currentRound);
+    if (!rd || rd.status !== 'live') err('No hay partidos en directo.');
+    if (rd.live.status === 'h1') rd.live.h1At = Date.now() - rd.live.halfSec * 1000; else if (rd.live.status === 'h2') rd.live.h2At = Date.now() - rd.live.halfSec * 1000;
+    liveTick(compId);
+  }
+  // Lo hace el ordenador del profesor cada pocos segundos: genera notas, responde por los equipos del sistema y actualiza el marcador
+  function liveTick(compId, t) {
+    const comp = getComp(compId); if (!isOwner(currentUser(), comp)) return false;
+    const rd = roundOf(compId, comp.currentRound); if (!rd || rd.status !== 'live' || !rd.live) return false;
+    const L = rd.live; t = t || Date.now(); let changed = false;
+    let clk = liveClock(rd, t);
+    const level = comp.config.difficulty;
+    for (const m of matchesOf(compId, rd.number)) {
+      let li = liveInput(comp, rd, m); let res = TC.simulateMatch(li.input);
+      for (const [team, k, sub, rival] of [[li.home, 'h', li.hs, li.away], [li.away, 'a', li.as, li.home]]) {
+        const notes = (L.notes[team.id] = L.notes[team.id] || []);
+        const byId = Object.fromEntries(team.players.map((p) => [p.id, p]));
+        const onPitch = sub.snapshot.lineup.slots.map((id) => byId[id]).filter(Boolean); const bench = (sub.snapshot.lineup.bench || []).map((id) => byId[id]).filter(Boolean);
+        const mk = (half, slot, minute, halftime) => {
+          const id = team.id + ':' + rd.number + ':' + half + ':' + slot;
+          if (notes.some((x) => x.id === id)) return;
+          const ctx = { id, seqs: res.sequences, k, minute, half, used: notes.map((x) => x.type), rivalName: rival.name, onPitch, bench, injury: !halftime && half === 2 && L.injuries[team.id] === slot + 1, seed: comp.seed };
+          const note = halftime ? TC.LIVE.makeHalftime(ctx) : TC.LIVE.makeNote(ctx);
+          note.releasedAt = t; note.window = liveWindow(rd);
+          notes.push(note); changed = true;
+          if (team.ai && !team.coachId) { (L.ai[team.id] = L.ai[team.id] || {})[id] = TC.LIVE.aiAnswer(note, level, comp.seed); }
+        };
+        if (clk.half === 1 || clk.half === 2) LIVE_SLOTS.forEach((f, i) => { if (clk.elapsed >= f * L.halfSec) mk(clk.half, i, Math.min(clk.half === 1 ? 45 : 90, (clk.half === 1 ? 1 : 46) + Math.floor(f * 45)), false); });
+        if (L.status === 'ht') mk(1, 'ht', 45, true);
+      }
+      if (changed) { li = liveInput(comp, rd, m); res = TC.simulateMatch(li.input); }
+      const minute = clk.minute;
+      const nameOf = (id) => { const p = li.home.players.find((x) => x.id === id) || li.away.players.find((x) => x.id === id); return p ? p.name : ''; };
+      const ev = [];
+      for (const sq of res.sequences) {
+        if (sq.min > minute) break;
+        const tn = sq.team === 'h' ? li.home.name : li.away.name;
+        const shot = sq.steps.slice().reverse().find((x) => x.k === 'remate') || {}; const saved = sq.steps.some((x) => x.k === 'parada'); const last = { p: shot.p, k: saved ? 'parada' : 'remate' };
+        if (sq.outcome === 'goal') ev.push({ min: sq.min, team: sq.team, kind: 'gol', text: `¡Gol de ${tn}! Marca ${nameOf(last.p)}.` });
+        else if (sq.outcome === 'shot') ev.push({ min: sq.min, team: sq.team, kind: 'remate', text: `Ocasión de ${tn}: remate de ${nameOf(last.p)}${last.k === 'parada' ? ' y para el portero' : ' que se va fuera'}.` });
+      }
+      const sc = TC.LIVE.scoreAt(res.sequences, minute);
+      const f = { min: minute, score: sc, events: ev.slice(-10) };
+      if (JSON.stringify(L.feed[m.id]) !== JSON.stringify(f)) { L.feed[m.id] = f; changed = true; }
+    }
+    if (L.status === 'h1' && clk.left <= 0) { L.status = 'ht'; changed = true; save(); return liveTick(compId, t) || true; }
+    if (L.status === 'h2' && clk.left <= 0) { L.status = 'ft'; changed = true; }
+    if (changed) save();
+    return changed;
+  }
+  // El alumno responde a una nota del banquillo
+  function answerNote(teamId, noteId, ans) {
+    const team = getTeam(teamId); assertTeam(team);
+    const comp = getComp(team.compId); const rd = roundOf(comp.id, comp.currentRound);
+    if (!rd || rd.status !== 'live') err('No hay ningún partido en directo.');
+    const note = ((rd.live.notes || {})[teamId] || []).find((x) => x.id === noteId);
+    if (!note) err('Nota no encontrada.');
+    if (!noteOpen(rd, note)) err('Se ha acabado el tiempo para responder a esta nota.');
+    if (ans.opt == null) err('Elige un ajuste táctico.');
+    if ((ans.text || '').trim().length < 15) err('Escribe la consigna que das a tus jugadores (mínimo 15 caracteres).');
+    if (note.sub && !ans.subIn) err('Elige qué jugador entra.');
+    const d = load(); const k = teamId + ':' + rd.number;
+    if (!d.drafts[k]) d.drafts[k] = blankDraft(team, rd.number);
+    d.drafts[k].live = Object.assign({}, d.drafts[k].live || {}, { [noteId]: { opt: +ans.opt, text: String(ans.text).slice(0, 1200), subIn: ans.subIn || null, at: Date.now() } });
+    save(); return d.drafts[k].live[noteId];
+  }
+  function noteOpen(rd, note, t) {
+    t = t || Date.now();
+    if (!rd.live || rd.status !== 'live') return false;
+    if (note.halftime) return rd.live.status === 'ht' || (rd.live.h2At && t < rd.live.h2At + 60000);
+    return t < note.releasedAt + (note.window + 20) * 1000;
+  }
+  function playRound(compId) {
+    const comp = getComp(compId); assertOwner(comp);
+    const d = load();
+    const n = comp.currentRound; const rd = roundOf(compId, n);
+    if (!rd || (rd.status !== 'open' && rd.status !== 'live')) err('No hay ninguna jornada abierta.');
+    const ms = matchesOf(compId, n);
+    const alerts = rd.alerts || [];
+    ensureSubmissions(comp, n, alerts);
+    applyLearning(comp, n);
     // 3) simular
     for (const m of ms) {
-      const home = getTeam(m.homeId), away = getTeam(m.awayId);
-      const hs = lastSubmission(home.id, n), as = lastSubmission(away.id, n);
-      const input = { seed: m.seed, minutes: 90, weights: comp.config.weights, home: { team: home, snap: snapshotFor(home, hs) }, away: { team: away, snap: snapshotFor(away, as) } };
+      const li = liveInput(comp, rd, m); const { home, away, hs, as, input } = li;
       const res = TC.simulateMatch(input);
       m.input = { home: slimSnap(input.home.snap), away: slimSnap(input.away.snap), weights: clone(input.weights) }; // copia exacta para reproducir
       const stored = Object.assign({}, res); delete stored.sequences; seqCache[m.id] = res.sequences;
+      if (rd.live) {
+        stored.live = {};
+        for (const [team, k, sub] of [[home, 'h', hs], [away, 'a', as]]) {
+          const notes = rd.live.notes[team.id] || []; const ans = liveAnswersOf(rd, team.id);
+          const byId = Object.fromEntries(team.players.map((p) => [p.id, p])); const lu = sub.snapshot.lineup;
+          const pl = lu.slots.map((id) => byId[id]).filter(Boolean), bn = (lu.bench || []).map((id) => byId[id]).filter(Boolean);
+          const items = notes.map((nt) => ({ note: nt, answer: ans[nt.id] || null, eval: TC.LIVE.scoreAnswer(nt, ans[nt.id], pl, bn) }));
+          stored.live[k] = { items, avg: items.length ? Math.round((items.reduce((x, y) => x + y.eval.q, 0) / items.length) * 100) / 100 : null };
+        }
+      }
       m.result = stored; m.status = 'played'; m.playedAt = now(); m.submissionIds = { h: hs.id, a: as.id };
       postMatchUpdate(home, res, 'h'); postMatchUpdate(away, res, 'a');
       for (const [team, sub, k] of [[home, hs, 'h'], [away, as, 'a']]) proposeEvaluation(comp, team, sub, m, k);
       addLog(compId, null, 'partido', `J${n}: ${home.name} ${res.score[0]}-${res.score[1]} ${away.name}`);
     }
-    rd.status = 'played'; rd.playedAt = now(); rd.alerts = alerts;
+    rd.status = 'played'; rd.playedAt = now(); rd.alerts = alerts; if (rd.live) { rd.live.status = 'ft'; rd.live.feed = {}; }
     save();
     return { round: n, alerts };
   }
@@ -608,6 +744,11 @@
     if (!team.coachId) return;
     const d = load();
     const adapt = TC.evaluateAdaptation(sub.snapshot.plan, match.result.decisions.filter((x) => x.team === k));
+    const lv = match.result.live && match.result.live[k];
+    if (lv && lv.items.length) {
+      const liveS = lv.avg * 20; adapt.score20 = TC.round1(liveS * 0.7 + adapt.score20 * 0.3);
+      adapt.criteria = [{ k: 'directo', label: 'Respuestas en el banquillo (partido en directo)', max: 14, s: lv.avg, reason: `Media de ${lv.items.length} notas: ${Math.round(lv.avg * 100)}/100. ${lv.items.filter((x) => !x.answer).length} sin responder.` }].concat(adapt.criteria.map((c) => Object.assign({}, c, { max: Math.round(c.max * 0.3 * 10) / 10 })));
+    }
     const refl = d.reflections.find((r) => r.teamId === team.id && r.round === sub.round);
     const analysis = TC.evaluateReflection(refl ? refl.text : '');
     const ev = {
@@ -696,7 +837,7 @@
     getComp, getTeam, teamsOf, roundsOf, roundOf, matchesOf, getMatch, myTeams, myCompetitions, nextMatch, lastSubmission,
     createCompetition, updateConfig, joinWithCode, assignTeam, freeTeams, deleteCompetition,
     updateTeamIdentity, saveModel, saveBoards, saveCustomTask, deleteCustomTask, setPlayerAttr,
-    getDraft, saveDraft, openRound, ensureAiModels, validateForSubmit, submit, makeSubmission, autoWeek, blankDraft,
+    getDraft, saveDraft, openRound, ensureAiModels, startLive, startSecondHalf, endFirstHalfNow, liveTick, liveClock, answerNote, noteOpen, liveAnswersOf, validateForSubmit, submit, makeSubmission, autoWeek, blankDraft,
     roundStatus, playRound, matchSequences, unlockNextRound, resetCompetition, verifyMatch, friendly,
     standings, academicRanking, coachLevel, LEVELS,
     saveReflection, getReflection, saveEvaluation, evaluationsFor,

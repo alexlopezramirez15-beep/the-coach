@@ -177,7 +177,9 @@
     try { const ch = await pull(false); if (ch || st.pendingRender) { st.pendingRender = false; safeRender(); } }
     catch (e) { if (e.auth && G.UI) { G.UI.toast(e.message, 'bad'); G.UI.state.view = null; G.UI.render(); } }
   }
-  function startPolling() { stopPolling(); st.poll = setInterval(tick, (CFG.pollSeconds || 15) * 1000); }
+  let pollSec = CFG.pollSeconds || 15;
+  function startPolling() { stopPolling(); st.poll = setInterval(tick, pollSec * 1000); }
+  function setPollSeconds(n) { n = Math.max(3, +n || 15); if (n === pollSec) return; pollSec = n; if (st.poll) startPolling(); }
   function stopPolling() { if (st.poll) clearInterval(st.poll); st.poll = null; }
 
   /* ───── Sesión ───── */
@@ -201,6 +203,7 @@
     get pendingSecrets() { return st.secrets.length; },
     label, flush, pull,
     // Envía ya todo lo pendiente y espera a que el servidor lo confirme
+    setPollSeconds,
     async flushNow() { clearTimeout(st.timer); for (let i = 0; i < 4; i++) { while (st.inflight) await new Promise((r) => setTimeout(r, 80)); if (!diff().length && !st.secrets.length) return true; await flush(); if (st.status === 'offline' || st.status === 'error') return false; } return !diff().length && !st.secrets.length; },
     statusHtml() { return st.enabled && st.mode === 'remote' && st.token ? `<span id="sync-st" class="sync ${st.status}">${label()}</span>` : ''; },
     async init() {

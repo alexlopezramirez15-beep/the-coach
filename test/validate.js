@@ -1,6 +1,6 @@
 // Escenario de validación (apartado 27) + demo + reproducibilidad
 const store={};globalThis.localStorage={getItem:k=>store[k]||null,setItem:(k,v)=>{store[k]=v}};
-require('../js/engine.js');require('../js/store.js');require('../js/demo.js');
+require('../js/engine.js');require('../js/live.js');require('../js/store.js');require('../js/demo.js');
 const TC=globalThis.TC,S=globalThis.TCStore;const assert=require('assert');
 // Profesor crea competición con 4 alumnos
 const prof=S.register('Profe Marta','teacher');
