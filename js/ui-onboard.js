@@ -22,6 +22,7 @@
     const t = c.team; const first = !t.squadSeenAt;
     return `<div class="page-head"><div class="eyebrow">${first ? 'Paso 1 de 2 antes de competir' : 'Tu plantilla'}</div><h1>Presentación de la plantilla</h1>
       <p class="muted">${esc(t.name)} · 18 jugadores. Estúdialos antes de diseñar tu modelo de juego: el modelo se validará contra lo que estos jugadores saben hacer.</p></div>
+    ${first ? '<div class="notice warn"><b>Para empezar:</b> estudia tus 18 jugadores y pulsa <b>«He revisado la plantilla»</b>. Después diseñarás y presentarás tu modelo de juego; al presentarlo se desbloquea la planificación de la semana (microciclo, tareas, rival, plan y alineación).</div>' : ''}
     <div class="row wrap"><button class="btn" data-act="downloadReport">Descargar informe de la plantilla</button>${first ? '<button class="btn primary" data-act="squadSeen">He revisado la plantilla: diseñar mi modelo de juego</button>' : '<button class="btn ghost" data-go="modelo">Ir al modelo de juego</button>'}</div>
     <h2 class="sec">Perfil de la plantilla por espacios de fase</h2>
     <p class="small muted">Media del once inicial en las capacidades que exige cada espacio de fase (marco de Método Pro). Los porteros no se incluyen.</p>
@@ -30,7 +31,8 @@
       <div class="pl-head"><span class="pl-r ${UI.attrClass(r)}">${r}</span><div><b>${esc(p.name)}</b><small>${esc(TC.POSITIONS[p.pos].label)}${p.sec.length ? ' · también ' + p.sec.join(', ') : ''}</small></div><span class="pos ${TC.POSITIONS[p.pos].line}">${p.pos}</span></div>
       <p class="small muted">${esc(p.profile)} · ${p.age} años · ${p.height} cm · pierna ${p.foot.toLowerCase()}</p>
       <div class="g4mini">${Object.keys(TC.ATTR_GROUPS).map((g) => `<div><small>${GROUP_SHORT[g]}</small><b class="${UI.attrClass(gAvg(p, g))}">${gAvg(p, g)}</b></div>`).join('')}</div>
-      <div class="small"><span class="up">▲</span> ${sw.top.slice(0, 2).map(esc).join(', ')}<br><span class="down">▼</span> ${sw.low.slice(0, 2).map(esc).join(', ')}</div></article>`; }).join('')}</div>`).join('')}`;
+      <div class="small"><span class="up">▲</span> ${sw.top.slice(0, 2).map(esc).join(', ')}<br><span class="down">▼</span> ${sw.low.slice(0, 2).map(esc).join(', ')}</div></article>`; }).join('')}</div>`).join('')}
+    ${first ? '<div class="sticky-actions"><span class="muted small">¿Ya conoces a tus jugadores?</span><button class="btn primary" data-act="squadSeen">He revisado la plantilla: diseñar mi modelo de juego</button></div>' : ''}`;
   };
   A.squadSeen = () => { const c = UI.ctx(); S.markSquadSeen(c.team.id); UI.toast('Ahora diseña tu modelo de juego a partir de estos jugadores.'); UI.go('modelo'); };
 

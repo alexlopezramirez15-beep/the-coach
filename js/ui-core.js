@@ -128,14 +128,21 @@
     const c = UI.ctx();
     if (!c.user) { root.innerHTML = UI.views.login(c); return; }
     let view = UI.state.view;
+    const nav = c.user.role === 'teacher' ? TEACHER_NAV : COACH_NAV;
     if (c.user.role === 'student' && !c.team) view = 'espera';
     // Orden obligatorio: primero conocer la plantilla, después presentar el modelo de juego
     const GATED = ['microciclo', 'biblioteca', 'rival', 'plan', 'alineacion', 'tarea', 'partido'];
+    let locked = [];
     if (c.user.role === 'student' && c.team) {
-      if (!c.team.squadSeenAt && view !== 'estado') view = 'presentacion';
-      else if (!c.team.model.submittedAt && GATED.includes(view)) { UI.state.gated = view; view = 'modelo'; }
+      const req = view;
+      if (!c.team.squadSeenAt) { locked = nav.flatMap((g) => g[1].map((x) => x[0])).filter((k) => !['presentacion', 'estado', 'plantilla'].includes(k)); if (!['estado', 'plantilla', 'jugador'].includes(view)) view = 'presentacion'; }
+      else if (!c.team.model.submittedAt) { locked = GATED; if (GATED.includes(view)) { UI.state.gated = view; view = 'modelo'; } }
+      // Explica por qué no se abre la pantalla pedida
+      if (req && req !== view && UI.views[req] && UI._lastGateMsg !== req + view) {
+        UI._lastGateMsg = req + view;
+        setTimeout(() => UI.toast(view === 'presentacion' ? 'Primero revisa tu plantilla y pulsa «He revisado la plantilla». Así se desbloquea el modelo de juego.' : 'Presenta tu modelo de juego para desbloquear la planificación de la semana.', 'bad'), 0);
+      }
     }
-    const nav = c.user.role === 'teacher' ? TEACHER_NAV : COACH_NAV;
     const allowed = nav.flatMap((g) => g[1].map((x) => x[0])).concat(['jugador', 'tarea', 'informe', 'espera', 'nueva-comp', 'profe-entrega', 'profe-alumno', 'logros']);
     if (!view || !allowed.includes(view) || !UI.views[view]) view = c.user.role === 'teacher' ? 'profe' : 'inicio';
     if (c.user.role === 'teacher' && !c.comp && !['profe', 'nueva-comp', 'estado', 'profe-alumnos', 'profe-alumno'].includes(view)) view = 'profe';
@@ -143,7 +150,7 @@
     let body;
     try { body = UI.views[view](c, UI.state.params); }
     catch (e) { console.error(e); body = `<div class="card"><h2>No se pudo mostrar esta pantalla</h2><p class="muted">${esc(e.message)}</p></div>`; }
-    const navHtml = view === 'espera' ? '' : nav.map(([g, items]) => `<div class="nav-group"><div class="nav-title">${esc(g)}</div>${items.map(([k, l]) => `<a href="#${k}" data-go="${k}" class="${k === view || (k === 'plantilla' && view === 'jugador') || (k === 'microciclo' && view === 'tarea') || (k === 'partido' && view === 'informe') || (k === 'profe-entregas' && view === 'profe-entrega') ? 'on' : ''}">${esc(l)}</a>`).join('')}</div>`).join('');
+    const navHtml = view === 'espera' ? '' : nav.map(([g, items]) => `<div class="nav-group"><div class="nav-title">${esc(g)}</div>${items.map(([k, l]) => `<a href="#${k}" data-go="${k}" class="${locked.includes(k) ? 'locked ' : ''}${k === view || (k === 'plantilla' && view === 'jugador') || (k === 'microciclo' && view === 'tarea') || (k === 'partido' && view === 'informe') || (k === 'profe-entregas' && view === 'profe-entrega') ? 'on' : ''}">${esc(l)}${locked.includes(k) ? ' <span aria-label="bloqueado">🔒</span>' : ''}</a>`).join('')}</div>`).join('');
     const ctxLabel = c.user.role === 'student'
       ? (c.team ? `${UI.teamBadge(c.team)} <span><b>${esc(c.team.name)}</b><small>${esc(c.comp.name)} · J${c.comp.currentRound}/${c.comp.config.rounds}</small></span>` : '')
       : (c.comp ? `<span><b>${esc(c.comp.name)}</b><small>Código ${esc(c.comp.code)} · J${c.comp.currentRound}/${c.comp.config.rounds}</small></span>` : '<span><b>Sin competición</b></span>');
