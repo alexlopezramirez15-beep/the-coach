@@ -9,5 +9,5 @@ cp js/*.js dist/js/
   printf '</head>\n<body>\n'
   sed '1,/<\/style>/d' index.html
   printf '</body>\n</html>\n'; } > dist/index.html
-printf '[[headers]]\n  for = "/*"\n  [headers.values]\n    X-Frame-Options = "SAMEORIGIN"\n    Referrer-Policy = "strict-origin-when-cross-origin"\n    Cache-Control = "no-cache"\n' > dist/netlify.toml
+printf "[build]\n  publish = \".\"\n\n" > dist/netlify.toml; printf '[[headers]]\n  for = "/*"\n  [headers.values]\n    X-Frame-Options = "SAMEORIGIN"\n    Referrer-Policy = "strict-origin-when-cross-origin"\n    Cache-Control = "no-cache"\n' >> dist/netlify.toml
 echo "dist listo"
