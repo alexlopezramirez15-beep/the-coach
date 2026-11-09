@@ -123,7 +123,7 @@
     const dis = editable ? '' : 'disabled';
     const players = sortPlayers(t.players);
     const entry = (k, j, mo, n) => `<div class="entry">${n > 1 ? `<div class="entry-h"><b>Fundamento ${j + 1}</b>${editable && j > 0 ? `<button type="button" class="icon" data-act="momentDel" data-k="${k}" data-j="${j}" aria-label="Quitar este fundamento" title="Quitar">×</button>` : ''}</div>` : ''}
-      <label class="field"><span>Fundamento de juego</span><input name="w.m.${k}.${j}.fund" list="fundamentos" value="${esc(mo.fund)}" placeholder="Ej. Tercer hombre, fijar para liberar…" ${dis}></label>
+      <label class="field"><span>Fundamento de juego</span><input name="w.m.${k}.${j}.fund" value="${esc(mo.fund)}" autocomplete="off" placeholder="Escribe el fundamento" ${dis}></label>
       <label class="field"><span>Explicación</span><textarea name="w.m.${k}.${j}.expl" rows="3" placeholder="¿Qué queremos que pase y cómo? ¿Por qué con estos jugadores?" ${dis}>${esc(mo.expl)}</textarea></label>
       <fieldset class="field"><legend>Jugadores principales que intervienen</legend><div class="pick">${players.map((p) => `<label class="pchip"><input type="checkbox" name="w.m.${k}.${j}.players" value="${p.id}" ${(mo.players || []).includes(p.id) ? 'checked' : ''} ${dis}><span>${p.pos} ${esc(p.name.split(' ').slice(-1)[0])}</span></label>`).join('')}</div></fieldset></div>`;
     const moment = (k, label) => { const items = w.moments[k].items; return `<div class="moment"><h4>${esc(label)}</h4>${items.map((mo, j) => entry(k, j, mo, items.length)).join('')}
@@ -133,7 +133,7 @@
     return `<div class="page-head">${!m.submittedAt ? '<div class="eyebrow">Paso 2 de 2 antes de competir</div>' : ''}<h1>Modelo de juego</h1><p class="muted">Construye tu modelo a partir de la plantilla que te ha tocado. Apóyate en el DAFO de tus jugadores: cada decisión debe poder explicarse con nombres propios.</p></div>
     ${gated ? '<div class="notice warn">Antes de planificar la semana tienes que presentar tu modelo de juego.</div>' : ''}
     ${m.submittedAt ? `<div class="notice ok">Modelo presentado el ${UI.fmtDate(m.submittedAt)} con una validación de ${m.validation ? m.validation.score : '—'}/100. Puedes ajustarlo y volver a presentarlo cuando quieras.</div>` : ''}
-    <datalist id="fundamentos">${TC.FUNDAMENTOS.map((x) => `<option value="${esc(x)}">`).join('')}</datalist>
+    
     <div class="grid g-task"><form data-submit="saveModel" data-change="modelLive" id="model-form" class="stack">
       <section class="card"><h2 class="phase-t">Características generales de nuestra plantilla</h2><p class="small muted">Describe cada línea: qué la hace fuerte, qué le falta y qué jugadores marcan la diferencia.</p>
         ${[['def', 'Línea defensiva'], ['mid', 'Línea de medios'], ['att', 'Línea de delanteros']].map(([k, l]) => `<label class="field"><span>${l}</span><textarea name="w.lines.${k}" rows="3" ${dis}>${esc(w.lines[k])}</textarea></label>`).join('')}</section>
