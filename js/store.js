@@ -186,7 +186,7 @@
     const sched = TC.roundRobin(r.shuffle(ids), cfg.doubleRound);
     cfg.rounds = sched.length;
     sched.forEach((pairs, i) => {
-      d.rounds.push({ id: uid('r'), compId: comp.id, number: i + 1, status: i === 0 ? 'open' : 'locked', openedAt: i === 0 ? now() : null, challenge: null });
+      d.rounds.push({ id: uid('r'), compId: comp.id, number: i + 1, status: i === 0 && opts.openFirst ? 'open' : 'locked', openedAt: i === 0 && opts.openFirst ? now() : null, challenge: null });
       pairs.forEach(([h, a]) => d.matches.push({ id: uid('m'), compId: comp.id, round: i + 1, homeId: h, awayId: a, status: 'scheduled', seed: comp.seed + ':' + (i + 1) + ':' + h.slice(-5) + a.slice(-5), result: null }));
     });
     addLog(comp.id, null, 'competicion', `Competición «${name}» creada con ${cfg.teams} equipos y ${cfg.rounds} jornadas.`);
@@ -294,6 +294,8 @@
   }
 
   /* ───────── Borradores semanales ───────── */
+  function blankScouting() { return { system: '', strengths: '', weaknesses: '', keyPlayers: [], moments: Object.fromEntries(TC.SCOUT_MOMENTS.map(([k]) => [k, { obs: '', plan: '' }])) }; }
+  function blankIndividual(team, round) { const p = TC.individualPlayer(team, round); return { playerId: p ? p.id : null, deficits: '', objective: '', contents: '', tasks: [{ name: '', desc: '', dur: 15 }], days: [], evaluation: '' }; }
   function blankDraft(team, round) {
     const comp = getComp(team.compId);
     const n = comp.config.sessionsPerWeek;
@@ -302,13 +304,19 @@
       microcycle: { sessions: days.map((day) => ({ id: uid('s'), day, type: 'Táctica ofensiva', objective: '', secondary: [], contents: '', duration: 90, intensity: 5, rivalLink: '', modelLink: '', tasks: [] })), justification: '' },
       plan: { tactics: { attStructure: team.model.attStructure, buildUp: team.model.buildUp, blockHeight: team.model.blockHeight, pressType: team.model.pressType, pressOrientation: team.model.pressOrientation, progression: team.model.progression, width: team.model.width, tempo: team.model.tempo, afterLoss: team.model.afterLoss, afterRecovery: team.model.afterRecovery, risk: 3 }, sections: {}, conditions: [], linkedSessions: [] },
       lineup: TC.autoLineup(team.players, team.model.defStructure),
+      scouting: blankScouting(), individual: blankIndividual(team, round),
       updatedAt: null, round,
     };
   }
   function getDraft(teamId, round) {
     const d = load(); const team = getTeam(teamId); const k = teamId + ':' + round;
     if (!d.drafts[k]) { d.drafts[k] = blankDraft(team, round); }
-    return d.drafts[k];
+    const dr = d.drafts[k];
+    if (!dr.scouting) dr.scouting = blankScouting();
+    dr.scouting.moments = Object.assign(blankScouting().moments, dr.scouting.moments || {});
+    if (!dr.individual) dr.individual = blankIndividual(team, round);
+    if (!dr.individual.tasks || !dr.individual.tasks.length) dr.individual.tasks = [{ name: '', desc: '', dur: 15 }];
+    return dr;
   }
   function saveDraft(teamId, round, patch) {
     const team = getTeam(teamId); assertTeam(team);
@@ -328,6 +336,19 @@
     if (!(dr.plan.linkedSessions || []).length || ((dr.plan.sections || {}).relacion || '').trim().length < 20) errs.push('Plan de partido, apartado H: vincula sesiones y explica la relación con el entrenamiento (obligatorio).');
     const ids = dr.lineup.slots.filter(Boolean);
     if (ids.length < 11 || new Set(ids).size < 11) errs.push('La alineación necesita 11 jugadores distintos.');
+    const len = (x) => (x || '').trim().length;
+    const sc = dr.scouting || {};
+    if (len(sc.system) < 10) errs.push('Informe del rival: describe su sistema y estructura.');
+    if (len(sc.strengths) < 20 || len(sc.weaknesses) < 20) errs.push('Informe del rival: fortalezas y debilidades del rival (mínimo 20 caracteres cada una).');
+    if ((sc.keyPlayers || []).length < 2) errs.push('Informe del rival: marca al menos 2 jugadores clave del rival.');
+    const scMiss = TC.SCOUT_MOMENTS.filter(([k]) => len(((sc.moments || {})[k] || {}).plan) < 20).map((x) => x[1]);
+    if (scMiss.length) errs.push(`Informe del rival: falta «cómo lo aprovechamos o neutralizamos» en ${scMiss.length} momento${scMiss.length > 1 ? 's' : ''} (${scMiss.slice(0, 3).join(', ')}${scMiss.length > 3 ? '…' : ''}).`);
+    const iv = dr.individual || {};
+    if (len(iv.deficits) < 20) errs.push('Trabajo individual: explica las carencias del jugador (mínimo 20 caracteres).');
+    if (len(iv.objective) < 15) errs.push('Trabajo individual: escribe el objetivo.');
+    if (!(iv.tasks || []).some((t) => len(t.desc) >= 20)) errs.push('Trabajo individual: describe al menos una tarea (mínimo 20 caracteres).');
+    if (!(iv.days || []).length) errs.push('Trabajo individual: elige qué días lo hará.');
+    if (len(iv.evaluation) < 15) errs.push('Trabajo individual: explica cómo medirás la mejora.');
     return errs;
   }
   // Entrega definitiva: crea una versión bloqueada que es la que usará el simulador.
@@ -349,7 +370,7 @@
     const microEval = TC.evaluateMicrocycle(micro, team.model, { sessionsRequired: getComp(team.compId).config.sessionsPerWeek, afterMatch: round > 1 });
     const sub = {
       id: uid('sub'), teamId: team.id, compId: team.compId, round, version: prev ? prev.version + 1 : 1, submittedAt: now(), locked: true, auto: !!auto, noTraining: !!noTraining,
-      snapshot: { model: clone(team.model), microcycle: micro, plan: clone(dr.plan), lineup: clone(dr.lineup) },
+      snapshot: { model: clone(team.model), microcycle: micro, plan: clone(dr.plan), lineup: clone(dr.lineup), scouting: clone(dr.scouting || null), individual: clone(dr.individual || null) },
       evals: {
         micro: Object.assign({}, microEval, { sessions: undefined }),
         plan: TC.evaluatePlan(dr.plan, team.model, micro, team),
@@ -479,14 +500,30 @@
       } else p.fatigue = Math.round(p.fatigue * 0.6);
     }
   }
+  // Los equipos del sistema sin modelo propio reciben uno de los modelos tipo (así cada rival juega distinto)
+  function ensureAiModels(compId) {
+    const comp = getComp(compId); const r = TC.makeRng('presets:' + comp.seed);
+    const order = r.shuffle(TC.MODEL_PRESETS.map((_, i) => i)); let k = 0;
+    for (const t of teamsOf(compId)) if (t.ai && !t.coachId && !t.model.updatedAt) { Object.assign(t.model, clone(TC.MODEL_PRESETS[order[k++ % order.length]]), { updatedAt: now() }); }
+  }
+  // El superadministrador abre la semana: hasta entonces el alumno no ve el bloque «Semana»
+  function openRound(compId) {
+    const comp = getComp(compId); assertOwner(comp);
+    const rd = roundOf(compId, comp.currentRound);
+    if (!rd || rd.status !== 'locked') err('La semana actual ya está abierta o disputada.');
+    ensureAiModels(compId);
+    rd.status = 'open'; rd.openedAt = now();
+    addLog(compId, null, 'jornada', `Semana ${rd.number} abierta: rival, informe, plan, microciclo, once y trabajo individual.`);
+    save(); return rd;
+  }
   function unlockNextRound(compId) {
     const comp = getComp(compId); assertOwner(comp);
     const rd = roundOf(compId, comp.currentRound);
     if (!rd || rd.status !== 'played') err('Primero hay que disputar la jornada actual.');
     const next = roundOf(compId, comp.currentRound + 1);
     if (!next) { comp.status = 'finished'; addLog(compId, null, 'competicion', 'Competición finalizada.'); save(); return null; }
-    comp.currentRound++; next.status = 'open'; next.openedAt = now();
-    addLog(compId, null, 'jornada', `Jornada ${next.number} abierta para entregas.`);
+    comp.currentRound++; ensureAiModels(compId); next.status = 'open'; next.openedAt = now();
+    addLog(compId, null, 'jornada', `Semana ${next.number} abierta para entregas.`);
     save(); return next;
   }
   function resetCompetition(compId) {
@@ -498,7 +535,7 @@
     d.reflections = d.reflections.filter((r) => !teamIds.has(r.teamId));
     for (const k of Object.keys(d.drafts)) if (teamIds.has(k.split(':')[0])) delete d.drafts[k];
     for (const m of matchesOf(compId)) { m.status = 'scheduled'; m.result = null; m.input = null; }
-    for (const r of roundsOf(compId)) { r.status = r.number === 1 ? 'open' : 'locked'; r.alerts = null; }
+    for (const r of roundsOf(compId)) { r.status = 'locked'; r.openedAt = null; r.alerts = null; }
     let i = 0;
     const usedNames = new Set();
     for (const t of teamsOf(compId)) { t.indicators = Object.fromEntries(TC.INDICATORS.map((x) => [x[0], TC.IND_START])); t.indicatorHistory = []; t.players = TC.genSquad(comp.seed + ':' + i++, usedNames); }
@@ -659,7 +696,7 @@
     getComp, getTeam, teamsOf, roundsOf, roundOf, matchesOf, getMatch, myTeams, myCompetitions, nextMatch, lastSubmission,
     createCompetition, updateConfig, joinWithCode, assignTeam, freeTeams, deleteCompetition,
     updateTeamIdentity, saveModel, saveBoards, saveCustomTask, deleteCustomTask, setPlayerAttr,
-    getDraft, saveDraft, validateForSubmit, submit, makeSubmission, autoWeek, blankDraft,
+    getDraft, saveDraft, openRound, ensureAiModels, validateForSubmit, submit, makeSubmission, autoWeek, blankDraft,
     roundStatus, playRound, matchSequences, unlockNextRound, resetCompetition, verifyMatch, friendly,
     standings, academicRanking, coachLevel, LEVELS,
     saveReflection, getReflection, saveEvaluation, evaluationsFor,

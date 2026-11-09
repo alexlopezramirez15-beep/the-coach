@@ -208,5 +208,41 @@
   }
   const words = (t) => t.replace(/##[^\n]*/g, '').split(/\s+/).filter(Boolean).length;
 
-  G.TCStories = { clubHistory, playerStory, toHtml, words, squadFacts };
+
+  /* ───── Informe de scouting del rival, fase a fase ───── */
+  function scoutReport(rival, round) {
+    const r = rng('scout:' + rival.id + ':' + round);
+    const m = rival.model; const ps = rival.players;
+    const A = (p, a) => p.attrs[a];
+    const nm = (p) => p.name;
+    const of = (line) => ps.filter((p) => TC.POSITIONS[p.pos].line === line);
+    const best = (list, a) => list.slice().sort((x, y) => A(y, a) - A(x, a))[0];
+    const worst = (list, a) => list.slice().sort((x, y) => A(x, a) - A(y, a))[0];
+    const top = (list) => list.slice().sort((x, y) => TC.playerRating(y) - TC.playerRating(x));
+    const D = top(of('def')), M = top(of('mid')), F = top(of('att')), GK = top(of('gk'))[0];
+    const cbs = D.filter((p) => p.pos === 'DFC'), fbs = D.filter((p) => p.pos !== 'DFC');
+    const piv = M.filter((p) => p.pos === 'MCD')[0] || M[0];
+    const lvl = (v) => (v >= 75 ? 'excelente' : v >= 66 ? 'notable' : v >= 58 ? 'aceptable' : 'deficiente');
+    const slowCb = worst(cbs.length ? cbs : D, 'velocidad'); const badPassCb = worst(cbs.length ? cbs : D, 'pase');
+    const fastF = best(F.concat(fbs), 'velocidad'); const aerial = best(ps.filter((p) => p.pos !== 'POR'), 'aereo');
+    const creator = best(M, 'pase'); const dribbler = best(F, 'regate'); const finisher = best(F, 'finalizacion');
+    const tiredMid = worst(M, 'resistencia'); const lazy = worst(F.concat(M), 'intDefensiva');
+    const avgL = (list, a) => Math.round(TC.avg(list.map((p) => A(p, a))));
+    const T = {};
+    T.salida = `Su portero, ${GK ? nm(GK) : '—'}, tiene un juego con los pies ${lvl(GK ? A(GK, 'pase') : 60)}. ${m.buildUp === 'corto' ? `Inician casi siempre en corto: los centrales se abren ${m.cbHeight === 'alta' ? 'muy altos, casi a la altura del pivote' : 'a la altura del área'} y ${nm(piv)} baja a recibir ${m.pivots === 'entre centrales' ? 'entre ellos' : 'por delante'}.` : m.buildUp === 'directo' ? `Apenas arriesgan: el balón largo buscando a ${nm(aerial)} y a las segundas jugadas es su recurso principal.` : `Alternan: si no les presionan salen en corto; ante presión alta, el portero busca el balón largo a ${nm(aerial)}.`} ${nm(badPassCb)} es el central que peor saca el balón (pase ${lvl(A(badPassCb, 'pase'))}); cuando la recibe con presión suele jugar hacia atrás o en largo. ${m.fullbacks === 'interiores' ? 'Los laterales se meten por dentro para dar un apoyo más en la salida.' : m.fullbacks === 'profundos' ? 'Los laterales se proyectan muy pronto y dejan a los centrales solos en la salida.' : 'Los laterales se quedan en la salida para ofrecer líneas de pase cortas.'}`;
+    T.progresion = `Progresan ${m.progression === 'interior' ? 'sobre todo por dentro' : m.progression === 'exterior' ? 'sobre todo por fuera, buscando a los laterales y a los extremos' : 'por dentro y por fuera, según dónde encuentran ventaja'} con un ritmo ${m.tempo}. La estructura con balón es ${m.attStructure}, ocupando ${m.width} carril${m.width === '1' ? '' : 'es'} con amplitud. El que más pases da entre líneas es ${nm(creator)} (pase ${lvl(A(creator, 'pase'))}, visión ${lvl(A(creator, 'percepcion'))}); si se le niega el balón, el equipo pierde fluidez. ${tiredMid ? `${nm(tiredMid)} acusa el desgaste: su resistencia es ${lvl(A(tiredMid, 'resistencia'))} y en las segundas partes deja de dar apoyos.` : ''}`;
+    T.ultimo = `En el último tercio ${m.finishing === 'centros' ? 'abusan del centro lateral, buscando el remate de ' + nm(aerial) : m.finishing === 'juego interior' ? 'buscan combinar por dentro, paredes y pases filtrados al espacio' : 'buscan la llegada de segunda línea al borde del área'}. ${nm(finisher)} es su mejor rematador (finalización ${lvl(A(finisher, 'finalizacion'))}) y ${nm(dribbler)} es el que más desequilibra en el uno contra uno (regate ${lvl(A(dribbler, 'regate'))}). ${r.pick(['Llegan pocos jugadores al área: rara vez más de dos.', 'Cuando atacan con muchos, dejan poca gente por detrás del balón.', 'Muchos de sus ataques terminan en tiros lejanos, sin profundidad.'])}`;
+    const hi = m.blockHeight === 'alto', lo = m.blockHeight === 'bajo';
+    T.bloqueAlto = hi ? `Es su altura preferida. Presionan ${m.pressType === 'al hombre' ? 'al hombre, emparejándose con cada rival' : m.pressType === 'mixta' ? 'de forma mixta: zona con saltos al hombre' : 'en zona'} y orientan la presión ${m.pressOrientation}. ${nm(F[0])} lidera la primera presión. La línea defensiva se adelanta (${m.depthControl}) y ${nm(slowCb)}, con velocidad ${lvl(A(slowCb, 'velocidad'))}, sufre cuando le atacan la espalda.` : `Solo presionan arriba de forma puntual, tras un saque de banda o un pase atrás. Cuando lo hacen, saltan desordenados y queda espacio a la espalda de los mediocentros. Su capacidad para repetir esfuerzos es ${lvl(avgL(F.concat(M), 'repetir'))}.`;
+    T.bloqueMedio = `${m.blockHeight === 'medio' ? 'Es su bloque habitual.' : 'Lo usan como transición entre presión y repliegue.'} Sistema sin balón ${m.defStructure}. Basculan ${m.coverage === 'basculación amplia' ? 'mucho hacia el lado del balón y dejan libre el lado débil' : m.coverage === 'permutas' ? 'con permutas entre líneas, lo que a veces deja un hueco' : 'con coberturas cortas y líneas muy juntas'}. ${lazy ? `${nm(lazy)} no siempre vuelve a defender (interpretación defensiva ${lvl(A(lazy, 'intDefensiva'))}).` : ''} Su capacidad de concentración media es ${lvl(avgL(ps, 'concentracion'))}.`;
+    T.bloqueBajo = lo ? `Es su seña de identidad: defienden muy cerca del área, con las líneas juntas, y esperan el error. Son fuertes por arriba (juego aéreo medio de la defensa: ${lvl(avgL(D, 'aereo'))}), pero conceden centros y disparos desde la frontal.` : `No les gusta defender cerca de su área. Cuando les obligan, se desordenan: los laterales se quedan a media altura y los centros al segundo palo les hacen mucho daño. La defensa tiene un juego aéreo ${lvl(avgL(D, 'aereo'))}.`;
+    T.transOf = `Al recuperar ${m.afterRecovery === 'contraataque' ? 'buscan la verticalidad inmediata: el balón va enseguida a ' + nm(fastF) + ', su jugador más rápido' : m.afterRecovery === 'ataque rápido' ? 'intentan atacar rápido, pero si no hay ventaja reorganizan' : 'priorizan conservar: el primer pase es seguro y vuelven a organizarse'}. ${nm(fastF)} tiene una velocidad ${lvl(A(fastF, 'velocidad'))} y aceleración ${lvl(A(fastF, 'aceleracion'))}.`;
+    T.transDef = `Tras perder el balón ${m.afterLoss === 'presión inmediata' ? 'presionan de inmediato con los más cercanos' : m.afterLoss === 'repliegue' ? 'repliegan enseguida detrás del balón' : 'dudan entre presionar y replegar, y a veces ni una cosa ni otra'}. Dejan atrás unas vigilancias ${m.restDefense}. ${m.fullbacks === 'profundos' ? 'Con los laterales tan arriba, la espalda de los laterales queda libre tras pérdida.' : 'El equipo queda bastante equilibrado tras pérdida.'}`;
+    T.abpOf = `En los córneres van ${m.cornerOf === 'primer palo' ? 'al primer palo' : m.cornerOf === 'segundo palo' ? 'al segundo palo' : 'en corto o con jugada ensayada'}. ${nm(aerial)} es su principal rematador (juego aéreo ${lvl(A(aerial, 'aereo'))}). Faltas: ${m.freeKicks || 'directas'}.`;
+    T.abpDef = `Defienden los córneres con un marcaje ${m.cornerDef || 'mixto'}. ${worst(ps.filter((p) => p.pos !== 'POR'), 'aereo') ? `${nm(worst(ps.filter((p) => p.pos !== 'POR' && p.height), 'aereo'))} es el que peor defiende por arriba.` : ''} Su concentración en las acciones a balón parado es ${lvl(avgL(D, 'concentracion'))}.`;
+    const intro = `Informe del cuerpo técnico sobre ${rival.name} para la semana ${round}. Sistema base sin balón ${m.defStructure}, con balón ${m.attStructure}. Lee cada fase y decide qué aprovechar y qué neutralizar: no todo lo que aparece aquí es igual de importante.`;
+    return { intro, moments: T };
+  }
+
+  G.TCStories = { clubHistory, playerStory, toHtml, words, squadFacts, scoutReport };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -372,6 +372,7 @@ details.vchk p{margin-top:6px}
 .entry-h{display:flex;justify-content:space-between;align-items:center}.entry-h b{font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink)}
 .add-entry{align-self:flex-start;border-style:dashed;color:var(--grass-d)}
 .entry-sum{padding-left:10px;border-left:2px solid var(--line-2)}
+fieldset.field{border:0;padding:0;margin:0;min-width:0}
 .moment fieldset{border:0;padding:0;margin:0}
 .moment legend,.field>legend{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px;padding:0}
 .pick{display:flex;flex-wrap:wrap;gap:6px}
@@ -389,6 +390,14 @@ details.decisions[open] summary{margin-bottom:10px}
 .fields.compact{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
 @media (max-width:900px){.g-player{grid-template-columns:minmax(0,1fr)}.ph-main .facts{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:620px){.player-hero,.club-head{flex-direction:column;align-items:flex-start}.dafo{grid-template-columns:minmax(0,1fr)}.bp-slot{width:64px}.bp-slot small{display:none}.bp-slot b{font-size:.7rem}.ph-main .facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.week-closed{align-items:center;text-align:center;padding:40px 20px;gap:12px}.week-closed p{max-width:60ch}.lock-big{font-size:2.6rem}
+.week-vs{flex-direction:row;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap}.week-vs>div{display:flex;flex-direction:column}.week-vs .r{text-align:right}.week-vs b{font-family:var(--f-display);font-size:1.3rem;text-transform:uppercase}.week-vs small{color:var(--muted)}.vs-x{font-family:var(--f-display);font-size:1.6rem;color:var(--muted)}
+.step{text-decoration:none;color:var(--text);transition:border-color .15s}.step:hover{border-color:var(--grass)}.step.done{border-left:4px solid var(--grass)}
+.step-n{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--ink);color:#fff;font-family:var(--f-display);font-weight:700}
+.rival-hero{flex-direction:row;align-items:center;gap:20px;flex-wrap:wrap}.rival-hero h2{font-size:1.9rem;text-transform:uppercase}.rival-hero .lines3{max-width:360px;margin-top:8px}
+.scout-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.scout-rep{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px}.scout-rep p{line-height:1.6}
+@media (max-width:900px){.scout-grid{grid-template-columns:minmax(0,1fr)}.week-vs .r{text-align:left}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -407,4 +416,5 @@ details.decisions[open] summary{margin-bottom:10px}
 <script src="js/ui-teacher.js"></script>
 <script src="js/ui-onboard.js"></script>
 <script src="js/ui-squad.js"></script>
+<script src="js/ui-week.js"></script>
 <script>UI.start();</script>

@@ -252,6 +252,31 @@
     for (const [k, ids] of Object.entries(pick)) w.moments[k] = { items: [{ fund: FUNDAMENTOS[Object.keys(pick).indexOf(k) * 3 % FUNDAMENTOS.length], expl: 'Explicación de ejemplo: qué buscamos en este momento, cómo lo hacemos y por qué encaja con estos jugadores.', players: ids.filter(Boolean) }] };
     return w;
   }
+  const MODEL_PRESETS = [
+    { identity: 'Juego de posición: dominar con balón y presionar tras pérdida.', attStructure: '1-3-2-5', buildUp: 'corto', fullbacks: 'interiores', width: '5', tempo: 'medio', progression: 'interior', defStructure: '1-4-3-3', blockHeight: 'alto', afterLoss: 'presión inmediata', afterRecovery: 'ataque rápido' },
+    { identity: 'Bloque bajo compacto y contraataque vertical.', attStructure: '1-4-4-2', buildUp: 'directo', width: '3', tempo: 'alto', progression: 'exterior', defStructure: '1-5-3-2', blockHeight: 'bajo', afterLoss: 'repliegue', afterRecovery: 'contraataque', finishing: 'centros' },
+    { identity: 'Presión alta al hombre y ataques rápidos.', attStructure: '1-4-3-3', buildUp: 'mixto', width: '4', tempo: 'alto', progression: 'mixta', defStructure: '1-4-4-2', blockHeight: 'alto', pressType: 'al hombre', afterLoss: 'presión inmediata', afterRecovery: 'contraataque' },
+    { identity: 'Bloque medio y posesión paciente.', attStructure: '1-3-1-4-2', buildUp: 'corto', width: '4', tempo: 'pausado', progression: 'interior', defStructure: '1-4-2-3-1', blockHeight: 'medio', afterLoss: 'mixta', afterRecovery: 'conservación' },
+    { identity: 'Juego exterior y centros al área.', attStructure: '1-2-3-5', buildUp: 'mixto', fullbacks: 'profundos', width: '5', tempo: 'medio', progression: 'exterior', finishing: 'centros', defStructure: '1-4-4-2', blockHeight: 'medio', afterLoss: 'mixta', afterRecovery: 'ataque rápido' },
+    { identity: 'Tres centrales, carrileros profundos y presión orientada hacia dentro.', attStructure: '1-3-2-5', buildUp: 'corto', width: '5', tempo: 'medio', progression: 'mixta', defStructure: '1-3-4-3', blockHeight: 'alto', pressOrientation: 'hacia dentro', afterLoss: 'mixta', afterRecovery: 'ataque rápido' },
+    { identity: 'Equipo directo y fuerte en balón parado.', attStructure: '1-4-4-2', buildUp: 'directo', width: '3', tempo: 'alto', progression: 'exterior', finishing: 'centros', defStructure: '1-4-4-2', blockHeight: 'medio', afterLoss: 'repliegue', afterRecovery: 'contraataque', cornerOf: 'primer palo' },
+    { identity: 'Bloque medio-bajo, transiciones y llegada de segunda línea.', attStructure: '1-4-2-4', buildUp: 'mixto', width: '3', tempo: 'medio', progression: 'interior', finishing: 'llegada de segunda línea', defStructure: '1-5-3-2', blockHeight: 'bajo', afterLoss: 'mixta', afterRecovery: 'contraataque' },
+  ];
+
+  // Trabajo individual: jugador asignado cada semana (rota entre los que tienen carencias más claras)
+  function individualPlayer(team, round) {
+    const deficit = (p) => { const vals = ALL_ATTRS.map((a) => p.attrs[a]).sort((x, y) => x - y); return playerRating(p) - avg(vals.slice(0, 3)); };
+    const cands = team.players.filter((p) => p.pos !== 'POR').sort((a, b) => deficit(b) - deficit(a)).slice(0, 8);
+    const order = makeRng('indiv:' + team.id).shuffle(cands);
+    return order[(Math.max(1, round) - 1) % order.length];
+  }
+  // Las 3 capacidades más bajas del jugador (para el profesor y las pistas)
+  function weakestAttrs(p, n) { return ALL_ATTRS.slice().sort((a, b) => p.attrs[a] - p.attrs[b]).slice(0, n || 3); }
+  const SCOUT_MOMENTS = [['salida', 'Salida de balón', 'ofensiva'], ['progresion', 'Progresión del juego', 'ofensiva'], ['ultimo', 'Último tercio', 'ofensiva'],
+    ['bloqueAlto', 'Bloque alto', 'defensiva'], ['bloqueMedio', 'Bloque medio', 'defensiva'], ['bloqueBajo', 'Bloque bajo', 'defensiva'],
+    ['transOf', 'Transición ofensiva (al recuperar)', 'transiciones'], ['transDef', 'Transición defensiva (al perder)', 'transiciones'],
+    ['abpOf', 'Balón parado ofensivo', 'abp'], ['abpDef', 'Balón parado defensivo', 'abp']];
+  const SCOUT_PHASES = { ofensiva: 'Fase ofensiva', defensiva: 'Fase defensiva', transiciones: 'Transiciones', abp: 'Acciones a balón parado' };
   function defaultModel() {
     return {
       attStructure: '1-4-3-3', buildUp: 'mixto', cbHeight: 'media', fullbacks: 'profundos', pivots: 'escalonados', width: '3', tempo: 'medio', progression: 'mixta', finishing: 'juego interior',
@@ -1124,7 +1149,7 @@
     makeRng, hashSeed, clamp, avg, round1,
     ATTR_GROUPS, ALL_ATTRS, ATTR_LABEL, POSITIONS, POS_KEYS, ARCHETYPES, FORMATIONS, ATT_STRUCTURES, INDICATORS, IND_LABEL, IND_START,
     TASK_TYPES, OBJ_PROFILE, PROVOCATIONS, PROV, SESSION_TYPES, DAYS, MODEL_FIELDS, COND_ACTIONS, COND_WHEN, TASK_LIBRARY, DEFAULT_WEIGHTS,
-    defaultModel, exampleWork, momentItems, modelRelevance, genSquad, playerRating, posFit, squadPotential, strengthsWeaknesses, autoLineup, roundRobin,
+    defaultModel, exampleWork, MODEL_PRESETS, individualPlayer, weakestAttrs, SCOUT_MOMENTS, SCOUT_PHASES, momentItems, modelRelevance, genSquad, playerRating, posFit, squadPotential, strengthsWeaknesses, autoLineup, roundRobin,
     evaluateTask, evaluateSession, evaluateMicrocycle, computeLearning, evaluatePlan, evaluateCoherence, evaluateAdaptation, evaluateReflection,
     simulateMatch, tacticsFrom, taskPlayers, sessionLoad: load,
     PHASE_SPACES, MODEL_DEMANDS, spaceValue, squadSpaces, validateModel, MODEL_MOMENTS, FUNDAMENTOS, blankWork,

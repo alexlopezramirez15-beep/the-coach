@@ -5,6 +5,8 @@ const TC=globalThis.TC,S=globalThis.TCStore;const assert=require('assert');
 // Profesor crea competición con 4 alumnos
 const prof=S.register('Profe Marta','teacher');
 const comp=S.createCompetition({name:'Liga Validación',config:{teams:4,sessionsPerWeek:3}});
+assert.equal(S.roundsOf(comp.id)[0].status,'locked','semana 1 cerrada hasta que el profesor la abra');S.openRound(comp.id);assert.equal(S.roundsOf(comp.id)[0].status,'open');assert.throws(()=>S.openRound(comp.id));
+const fillExtras=(dr,t)=>{const T='Texto suficientemente largo para validar el apartado.';dr.scouting.system='1-4-4-2 en bloque medio';dr.scouting.strengths=T;dr.scouting.weaknesses=T;dr.scouting.keyPlayers=['a','b'];for(const k of Object.keys(dr.scouting.moments))dr.scouting.moments[k].plan=T;Object.assign(dr.individual,{deficits:T,objective:T,evaluation:T,days:['Lunes'],tasks:[{name:'x',desc:T,dur:15}]});};
 assert.equal(S.roundsOf(comp.id).length,3);assert.equal(S.matchesOf(comp.id,1).length,2);
 // no duplicates
 const pairs=S.matchesOf(comp.id).map(m=>[m.homeId,m.awayId].sort().join());assert.equal(new Set(pairs).size,pairs.length);
@@ -18,6 +20,7 @@ students.forEach(({u,t},i)=>{S.loginAs(u.id);
   const dr=S.getDraft(t.id,1);
   dr.microcycle.sessions.forEach((s,j)=>{s.objective=['salida','presionAlta','abpOf'][j];s.intensity=[4,7,4][j];s.tasks=[Object.assign(S.clone(TC.TASK_LIBRARY[[1,3,9][j]]),{id:'x'+j})];s.rivalLink='Relación con el rival analizada';});
   dr.plan.sections={relacion:'Martes presión alta, lunes salida y viernes estrategia ofensiva.'};dr.plan.linkedSessions=dr.microcycle.sessions.map(s=>s.id);
+  assert.ok(S.validateForSubmit(t,dr).some(e=>/Trabajo individual/.test(e)),'pide trabajo individual');fillExtras(dr,t);assert.ok(S.getTeam(t.id).players.some(p=>p.id===dr.individual.playerId),'jugador asignado');
   S.saveDraft(t.id,1,dr);
   const sub=S.submit(t.id,1);assert.ok(sub.locked);
 });

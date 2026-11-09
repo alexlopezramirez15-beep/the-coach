@@ -3,16 +3,7 @@
   'use strict';
   const TC = G.TC, S = G.TCStore;
 
-  const MODELS = [
-    { identity: 'Juego de posición: dominar con balón y presionar tras pérdida.', attStructure: '1-3-2-5', buildUp: 'corto', fullbacks: 'interiores', width: '5', tempo: 'medio', progression: 'interior', defStructure: '1-4-3-3', blockHeight: 'alto', afterLoss: 'presión inmediata', afterRecovery: 'ataque rápido' },
-    { identity: 'Bloque bajo compacto y contraataque vertical.', attStructure: '1-4-4-2', buildUp: 'directo', width: '3', tempo: 'alto', progression: 'exterior', defStructure: '1-5-3-2', blockHeight: 'bajo', afterLoss: 'repliegue', afterRecovery: 'contraataque', finishing: 'centros' },
-    { identity: 'Presión alta al hombre y ataques rápidos.', attStructure: '1-4-3-3', buildUp: 'mixto', width: '4', tempo: 'alto', progression: 'mixta', defStructure: '1-4-4-2', blockHeight: 'alto', pressType: 'al hombre', afterLoss: 'presión inmediata', afterRecovery: 'contraataque' },
-    { identity: 'Bloque medio y posesión paciente.', attStructure: '1-3-1-4-2', buildUp: 'corto', width: '4', tempo: 'pausado', progression: 'interior', defStructure: '1-4-2-3-1', blockHeight: 'medio', afterLoss: 'mixta', afterRecovery: 'conservación' },
-    { identity: 'Juego exterior y centros al área.', attStructure: '1-2-3-5', buildUp: 'mixto', fullbacks: 'profundos', width: '5', tempo: 'medio', progression: 'exterior', finishing: 'centros', defStructure: '1-4-4-2', blockHeight: 'medio', afterLoss: 'mixta', afterRecovery: 'ataque rápido' },
-    { identity: 'Tres centrales, carrileros profundos y presión orientada hacia dentro.', attStructure: '1-3-2-5', buildUp: 'corto', width: '5', tempo: 'medio', progression: 'mixta', defStructure: '1-3-4-3', blockHeight: 'alto', pressOrientation: 'hacia dentro', afterLoss: 'mixta', afterRecovery: 'ataque rápido' },
-    { identity: 'Equipo directo y fuerte en balón parado.', attStructure: '1-4-4-2', buildUp: 'directo', width: '3', tempo: 'alto', progression: 'exterior', finishing: 'centros', defStructure: '1-4-4-2', blockHeight: 'medio', afterLoss: 'repliegue', afterRecovery: 'contraataque', cornerOf: 'primer palo' },
-    { identity: 'Bloque medio-bajo, transiciones y llegada de segunda línea.', attStructure: '1-4-2-4', buildUp: 'mixto', width: '3', tempo: 'medio', progression: 'interior', finishing: 'llegada de segunda línea', defStructure: '1-5-3-2', blockHeight: 'bajo', afterLoss: 'mixta', afterRecovery: 'contraataque' },
-  ];
+  const MODELS = TC.MODEL_PRESETS;
 
   function lib(name) { const t = TC.TASK_LIBRARY.find((x) => x.name === name); const c = S.clone(t); c.id = S.uid('task'); return c; }
 
@@ -46,6 +37,12 @@
     dr.plan.tactics = Object.assign(dr.plan.tactics, { attStructure: team.model.attStructure, buildUp: 'corto', blockHeight: 'alto', progression: 'interior', afterLoss: 'presión inmediata', afterRecovery: 'ataque rápido', risk: 3 });
     dr.plan.linkedSessions = ss.slice(1).map((s) => s.id);
     dr.plan.conditions = [{ when: 'perdiendo', from: 65, action: 'bandas' }, { when: 'ganando', from: 70, action: 'conservar' }, { when: 'empatando', from: 75, action: 'mas_riesgo' }];
+    const rival = S.getTeam(S.nextMatch(team).rivalId);
+    const rb = rival.players.slice().sort((a, b) => TC.playerRating(b) - TC.playerRating(a));
+    dr.scouting = Object.assign(dr.scouting, { system: '1-5-3-2 sin balón, 1-3-5-2 con balón', strengths: 'Bloque bajo muy junto y salidas rápidas por los carrileros; fuertes en el juego aéreo.', weaknesses: 'Sufren con los cambios de orientación y dejan espacio a la espalda de los carrileros.', keyPlayers: rb.slice(0, 3).map((p) => p.id) });
+    const PL = { salida: 'Presionar al central izquierdo, que es el que peor sale, y cerrar el pase al pivote.', progresion: 'Orientar su juego hacia fuera y saltar sobre el carrilero cuando reciba de espaldas.', ultimo: 'Defender el área con cinco y vigilar al delantero en los centros.', bloqueAlto: 'Salir en corto atrayendo y buscar al tercer hombre a la espalda de su primera línea.', bloqueMedio: 'Fijar por dentro y cambiar de orientación rápido al lado débil.', bloqueBajo: 'Ocupar los cinco carriles, centros al segundo palo y llegada de segunda línea.', transOf: 'Primer pase fuera de la zona de presión para atacar la espalda de los carrileros.', transDef: 'Vigilancias 3+1 y presión inmediata de los tres más cercanos durante cinco segundos.', abpOf: 'Córneres al primer palo con bloqueo para evitar a su central más alto.', abpDef: 'Defensa mixta y marca individual sobre sus dos rematadores.' };
+    for (const [k, v] of Object.entries(PL)) dr.scouting.moments[k] = { obs: 'Observado en sus últimos partidos y en el informe del analista.', plan: v };
+    Object.assign(dr.individual, { deficits: 'Le cuesta decidir rápido bajo presión y pierde balones al girar con el rival encima.', objective: 'Mejorar la percepción antes de recibir y el perfilado para jugar de cara.', contents: 'Percepción, orientación corporal y control orientado.', tasks: [{ name: 'Rondo con comodín perfilado', desc: 'Rondo 4x2 en el que el jugador hace de comodín y debe mirar antes de recibir; dos toques máximo.', dur: 15 }], days: [ss[1].day, ss[2].day], evaluation: 'Contaremos las pérdidas tras recepción en la sesión del jueves y en el partido.' });
     dr.updatedAt = S.now();
     S.save();
   }
@@ -65,7 +62,7 @@
     }
     d.session = { userId: teacher.id, at: S.now() };
     if (prev) S.deleteCompetition(prev.id);
-    const comp = S.createCompetition({ name: 'Liga Demo Manager Academy', className: 'CFGM Técnico Deportivo en Fútbol · Nivel 2', demo: true, seed: 'demo-2026', config: { teams: 8, doubleRound: false, sessionsPerWeek: 4, difficulty: 'medio' }, teamNames: ['CF Alameda', 'UD Sierra Norte', 'CD Faro Viejo', 'Racing Valle Verde', 'Atlètic Les Torres', 'SD Ribera Baja', 'CE Molinos', 'Deportivo Cumbres'] });
+    const comp = S.createCompetition({ name: 'Liga Demo Manager Academy', className: 'CFGM Técnico Deportivo en Fútbol · Nivel 2', demo: true, seed: 'demo-2026', config: { teams: 8, doubleRound: false, sessionsPerWeek: 4, difficulty: 'medio' }, openFirst: true, teamNames: ['CF Alameda', 'UD Sierra Norte', 'CD Faro Viejo', 'Racing Valle Verde', 'Atlètic Les Torres', 'SD Ribera Baja', 'CE Molinos', 'Deportivo Cumbres'] });
     const teams = S.teamsOf(comp.id);
     teams.forEach((t, i) => { Object.assign(t.model, MODELS[i], { updatedAt: S.now() }); });
     const my = teams[0];

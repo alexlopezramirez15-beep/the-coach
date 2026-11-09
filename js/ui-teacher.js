@@ -40,7 +40,7 @@
         </tbody></table></div></section>
       <section class="card"><h3>Jornada ${n}</h3>
         ${S.matchesOf(comp.id, n).map((m) => `<div class="round-line">${esc(S.getTeam(m.homeId).name)} ${m.status === 'played' ? `<b>${m.result.score.join('-')}</b>` : 'vs'} ${esc(S.getTeam(m.awayId).name)}</div>`).join('')}
-        <div class="stack">${rd.status === 'open' ? '<button class="btn primary block" data-act="playRound">Activar jornada y simular partidos</button>' : ''}${rd.status === 'played' && comp.status !== 'finished' ? `<button class="btn primary block" data-act="unlockNext">${n < comp.config.rounds ? 'Desbloquear jornada ' + (n + 1) : 'Cerrar competición'}</button>` : ''}
+        <div class="stack">${rd.status === 'locked' ? `<button class="btn primary block" data-act="openWeek">Abrir semana ${n}</button><p class="small muted">Los alumnos no ven el bloque «Semana» hasta que la abras.</p>` : ''}${rd.status === 'open' ? '<button class="btn primary block" data-act="playRound">Activar jornada y simular partidos</button>' : ''}${rd.status === 'played' && comp.status !== 'finished' ? `<button class="btn primary block" data-act="unlockNext">${n < comp.config.rounds ? 'Desbloquear jornada ' + (n + 1) : 'Cerrar competición'}</button>` : ''}
         <button class="btn ghost block" data-go="profe-jornadas">Gestionar jornadas</button></div></section>
     </div>
     <div class="grid g2">
@@ -60,6 +60,7 @@
       const r = S.playRound(c.comp.id); UI.toast(`Jornada ${r.round} disputada. Clasificación actualizada.`); UI.go('profe-jornadas');
     });
   };
+  A.openWeek = () => { const c = UI.ctx(); UI.ask('Abrir semana ' + c.comp.currentRound, 'Los alumnos verán el rival, el informe del rival, el plan de partido, el microciclo, el once titular y el trabajo individual, y podrán preparar y entregar la semana.', 'Abrir semana', () => { const r = S.openRound(c.comp.id); UI.toast(`Semana ${r.number} abierta.`); UI.render(); }); };
   A.unlockNext = () => { const c = UI.ctx(); const r = S.unlockNextRound(c.comp.id); UI.toast(r ? `Jornada ${r.number} abierta para entregas.` : 'Competición finalizada.'); UI.render(); };
 
   /* ───── Nueva competición ───── */
@@ -97,7 +98,7 @@
     ${S.roundsOf(comp.id).map((rd) => { const rs = S.roundStatus(comp.id, rd.number); const done = rs.filter((x) => x.sub && !x.sub.auto).length; const humans = rs.filter((x) => x.team.coachId).length; return `<section class="card ${rd.number === comp.currentRound ? 'mine' : ''}"><div class="card-head"><h3>Jornada ${rd.number}</h3><span>${UI.pill(rd.status === 'open' ? 'Abierta' : rd.status === 'played' ? 'Disputada' : 'Bloqueada', rd.status === 'open' ? 'info' : rd.status === 'played' ? 'ok' : '')} ${rd.status !== 'locked' ? `<span class="muted small">${done}/${humans} entregas de alumnos</span>` : ''}</span></div>
       <div class="ms">${S.matchesOf(comp.id, rd.number).map((m) => `<a ${m.status === 'played' ? `href="#informe" data-go="informe" data-p='{"m":"${m.id}"}'` : ''} class="m ${m.status}">${esc(S.getTeam(m.homeId).name)} ${m.status === 'played' ? `<b>${m.result.score.join('-')}</b>` : 'vs'} ${esc(S.getTeam(m.awayId).name)}</a>`).join('')}</div>
       ${rd.alerts && rd.alerts.length ? `<ul class="small warn-t">${rd.alerts.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
-      ${rd.number === comp.currentRound && rd.status === 'open' ? '<button class="btn primary" data-act="playRound">Activar y simular</button>' : ''}${rd.number === comp.currentRound && rd.status === 'played' && comp.status !== 'finished' ? `<button class="btn primary" data-act="unlockNext">${rd.number < comp.config.rounds ? 'Desbloquear jornada ' + (rd.number + 1) : 'Cerrar competición'}</button>` : ''}
+      ${rd.number === comp.currentRound && rd.status === 'locked' ? `<button class="btn primary" data-act="openWeek">Abrir semana ${rd.number}</button>` : ''}${rd.number === comp.currentRound && rd.status === 'open' ? '<button class="btn primary" data-act="playRound">Activar y simular</button>' : ''}${rd.number === comp.currentRound && rd.status === 'played' && comp.status !== 'finished' ? `<button class="btn primary" data-act="unlockNext">${rd.number < comp.config.rounds ? 'Desbloquear jornada ' + (rd.number + 1) : 'Cerrar competición'}</button>` : ''}
     </section>`; }).join('')}`;
   };
 
