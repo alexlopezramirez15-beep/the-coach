@@ -71,6 +71,7 @@
     const my = teams[0];
     my.coachId = coach.id; my.ai = false; my.squadSeenAt = S.now();
     my.model.notes = { ofensiva: 'Tenemos centrales y pivote con buena salida y un interior muy asociativo: queremos atraer y superar la primera presión con tercer hombre.', defensiva: 'Presión alta tras pérdida porque los delanteros repiten esfuerzos; los centrales son rápidos para defender la espalda.', transAD: 'Los tres más cercanos presionan cinco segundos; el resto cierra líneas de pase interiores.', transDA: 'Primer pase fuera de la zona de presión para atacar rápido con los extremos.', abp: 'Dos centrales dominan el juego aéreo: córners al segundo palo.' };
+    my.model.work = TC.exampleWork(my.players); my.model.identity = my.model.work.ideas.filter((x) => x.trim()).join(' · ');
     my.model.submittedAt = S.now(); my.model.validation = TC.validateModel(my.model, my.players);
     S.save();
     // entregas de los equipos del sistema (planes completos y bloqueados)

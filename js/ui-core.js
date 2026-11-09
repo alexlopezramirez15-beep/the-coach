@@ -112,7 +112,7 @@
 
   const COACH_NAV = [
     ['Competición', [['inicio', 'Inicio'], ['partido', 'Centro de partido'], ['clasificacion', 'Clasificación'], ['ranking', 'Ranking de entrenadores'], ['historial', 'Historial']]],
-    ['Mi equipo', [['presentacion', 'Presentación de plantilla'], ['equipo', 'Mi equipo'], ['plantilla', 'Plantilla'], ['modelo', 'Modelo de juego'], ['pizarra', 'Pizarra táctica']]],
+    ['Mi equipo', [['presentacion', 'Presentación de plantilla'], ['club', 'Historia del club'], ['equipo', 'Mi equipo'], ['plantilla', 'Plantilla'], ['modelo', 'Modelo de juego'], ['pizarra', 'Pizarra táctica']]],
     ['Semana', [['microciclo', 'Microciclo'], ['biblioteca', 'Biblioteca de tareas'], ['rival', 'Análisis del rival'], ['plan', 'Plan de partido'], ['alineacion', 'Alineación']]],
     ['Proyecto', [['estado', 'Estado del desarrollo']]],
   ];
@@ -135,7 +135,7 @@
     let locked = [];
     if (c.user.role === 'student' && c.team) {
       const req = view;
-      if (!c.team.squadSeenAt) { locked = nav.flatMap((g) => g[1].map((x) => x[0])).filter((k) => !['presentacion', 'estado', 'plantilla'].includes(k)); if (!['estado', 'plantilla', 'jugador'].includes(view)) view = 'presentacion'; }
+      if (!c.team.squadSeenAt) { locked = nav.flatMap((g) => g[1].map((x) => x[0])).filter((k) => !['presentacion', 'estado', 'plantilla', 'club'].includes(k)); if (!['estado', 'plantilla', 'jugador', 'club'].includes(view)) view = 'presentacion'; }
       else if (!c.team.model.submittedAt) { locked = GATED; if (GATED.includes(view)) { UI.state.gated = view; view = 'modelo'; } }
       // Explica por qué no se abre la pantalla pedida
       if (req && req !== view && UI.views[req] && UI._lastGateMsg !== req + view) {
@@ -157,7 +157,7 @@
     const compSwitch = c.user.role === 'teacher' && c.comps.length > 1 ? `<select class="mini" data-change="switchComp" aria-label="Competición">${c.comps.map((x) => UI.opt(x.id, x.name, c.comp && c.comp.id)).join('')}</select>` : c.user.role === 'student' && c.teams.length > 1 ? `<select class="mini" data-change="switchTeam" aria-label="Equipo">${c.teams.map((x) => UI.opt(x.id, x.name + ' · ' + S.getComp(x.compId).name, c.team.id)).join('')}</select>` : '';
     root.innerHTML = `
       <header class="topbar">
-        <a class="brand" href="#inicio" data-go="${c.user.role === 'teacher' ? 'profe' : 'inicio'}"><span class="logo">TC</span><span class="brand-t"><b>THE COACH</b><small>Manager Academy</small></span></a>
+        <a class="brand" href="#inicio" data-go="${c.user.role === 'teacher' ? 'profe' : 'inicio'}">${G.TCArt.brand()}</a>
         <div class="ctx">${ctxLabel}${compSwitch}</div>
         <div class="who">${G.TCSync ? G.TCSync.statusHtml() : ''}<span class="role ${c.user.superadmin ? 'admin' : c.user.role}">${c.user.superadmin ? 'Superadmin' : c.user.role === 'teacher' ? 'Profesor' : 'Entrenador'}</span><span class="uname">${esc(c.user.name)}</span><button class="btn ghost sm" data-act="switchProfile">Salir</button></div>
       </header>
@@ -203,7 +203,7 @@
     return `
     <div class="login">
       <section class="login-hero">
-        <div class="brand big"><span class="logo">TC</span><span class="brand-t"><b>THE COACH</b><small>Manager Academy</small></span></div>
+        <div class="brand big">${G.TCArt.brand(true)}</div>
         <h1>Piensa como un entrenador.<br>Compite con tu clase.</h1>
         <p>Simulador educativo de gestión y competición táctica para el CFGM de Técnico Deportivo en Fútbol. Lo que trabajas durante la semana decide lo que tu equipo es capaz de hacer el día del partido.</p>
         <ol class="flow"><li>Conoce tu plantilla</li><li>Modelo de juego</li><li>Microciclo</li><li>Tareas</li><li>Rival</li><li>Plan de partido</li><li>Simulación</li><li>Análisis</li></ol>
@@ -285,7 +285,7 @@
     const v = location.hash.slice(1);
     UI.state.view = v || null;
     if (G.TCSync && G.TCSync.enabled) {
-      const root = UI.$('#app'); if (root) root.innerHTML = '<div class="boot"><span class="logo">TC</span><p class="muted">Conectando con el servidor…</p></div>';
+      const root = UI.$('#app'); if (root) root.innerHTML = '<div class="boot">' + G.TCArt.logo(64) + '<p class="muted">Conectando con el servidor…</p></div>';
       try { await G.TCSync.init(); } catch (e) { console.error(e); }
     }
     UI.render();

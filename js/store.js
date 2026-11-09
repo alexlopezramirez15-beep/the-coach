@@ -233,14 +233,43 @@
     save(); return team.model;
   }
   function markSquadSeen(teamId) { const team = getTeam(teamId); assertTeam(team); if (!team.squadSeenAt) { team.squadSeenAt = now(); addLog(team.compId, team.id, 'plantilla', 'Ha revisado la presentación de su plantilla.'); save(); } }
+  // Qué falta en el cuaderno del modelo para poder presentarlo
+  function modelMissing(m) {
+    const w = Object.assign(TC.blankWork(), m.work || {}); m.work = w;
+    const out = []; const len = (x) => (x || '').trim().length;
+    const LN = { def: 'línea defensiva', mid: 'línea de medios', att: 'línea de delanteros' };
+    for (const k of ['def', 'mid', 'att']) if (len(w.lines[k]) < 40) out.push(`Características de la ${LN[k]} (mínimo 40 caracteres)`);
+    if (w.ideas.filter((x) => len(x) >= 5).length < 3) out.push('Idea de juego: al menos 3 de las 5 ideas');
+    if (len(w.systemText) < 20) out.push('Sistema de juego: explica por qué este sistema (mínimo 20 caracteres)');
+    for (const g of Object.values(TC.MODEL_MOMENTS)) for (const [k, l] of g.moments) {
+      const mo = w.moments[k] || {};
+      const miss = [];
+      if (len(mo.fund) < 3) miss.push('fundamento'); if (len(mo.expl) < 30) miss.push('explicación (mín. 30)'); if (!(mo.players || []).length) miss.push('jugadores');
+      if (miss.length) out.push(`${l}: ${miss.join(', ')}`);
+    }
+    return out;
+  }
+  // Cuaderno del alumno: DAFO de cada jugador y su pizarra de plantilla (se guarda aparte del equipo)
+  const NB = (teamId) => teamId + ':0';
+  function getNotebook(teamId) { const d = load(); return d.drafts[NB(teamId)] || { dafo: {}, board: { formation: null, slots: [] }, updatedAt: null }; }
+  function saveNotebook(teamId, patch) {
+    const team = getTeam(teamId); assertTeam(team);
+    const d = load(); const cur = getNotebook(teamId);
+    d.drafts[NB(teamId)] = Object.assign({}, cur, clone(patch), { updatedAt: now() });
+    save(); return d.drafts[NB(teamId)];
+  }
+  function saveDafo(teamId, playerId, dafo) {
+    const nb = getNotebook(teamId); const all = Object.assign({}, nb.dafo || {});
+    all[playerId] = { f: dafo.f || '', d: dafo.d || '', a: dafo.a || '', o: dafo.o || '', at: now() };
+    return saveNotebook(teamId, { dafo: all });
+  }
   // Presentar el modelo: exige justificación y guarda la validación contra la plantilla real
   function submitModel(teamId, model) {
     const team = getTeam(teamId); assertTeam(team);
     const m = Object.assign(TC.defaultModel(), model);
-    const missing = [];
-    if ((m.identity || '').trim().length < 15) missing.push('la identidad del equipo');
-    for (const [k, g] of Object.entries(TC.MODEL_FIELDS)) if (((m.notes || {})[k] || '').trim().length < 30) missing.push('la justificación de ' + g.label.toLowerCase());
-    if (missing.length) err('Para presentar el modelo falta:\n• ' + missing.join('\n• ') + '\n(mínimo 30 caracteres por fase, pensando en tus jugadores).');
+    const missing = modelMissing(m);
+    if (missing.length) err('Para presentar el modelo falta:\n• ' + missing.slice(0, 12).join('\n• ') + (missing.length > 12 ? `\n• … y ${missing.length - 12} apartados más` : ''));
+    m.identity = m.work.ideas.filter((x) => x.trim()).join(' · ');
     const validation = TC.validateModel(m, team.players);
     m.updatedAt = now(); m.submittedAt = now(); m.validation = validation;
     team.model = m;
@@ -623,7 +652,7 @@
   G.TCStore = {
     load, save, uid, now, clone, err, useBackend, isRemote, emptyDb,
     currentUser, register, loginAs, logout, users: () => load().users,
-    requestAccess, loginWithCode, adminExists, adminSetup, adminLogin, approveStudent, regenerateCode, setStudentStatus, markSquadSeen, submitModel,
+    requestAccess, loginWithCode, getNotebook, saveNotebook, saveDafo, modelMissing, adminExists, adminSetup, adminLogin, approveStudent, regenerateCode, setStudentStatus, markSquadSeen, submitModel,
     isOwner, canEditTeam,
     getComp, getTeam, teamsOf, roundsOf, roundOf, matchesOf, getMatch, myTeams, myCompetitions, nextMatch, lastSubmission,
     createCompetition, updateConfig, joinWithCode, assignTeam, freeTeams, deleteCompetition,

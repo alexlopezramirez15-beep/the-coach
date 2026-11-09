@@ -222,13 +222,37 @@
       ['throwIns', 'Saques de banda', ['largo al área', 'corto y conservar']],
     ] },
   };
+  // Cuaderno del modelo de juego que escribe el alumno (fases y momentos)
+  const MODEL_MOMENTS = {
+    ofensiva: { label: 'Fase ofensiva', fields: 'ofensiva', moments: [['salida', 'Salida de balón'], ['progresion', 'Progresión del juego'], ['ultimo', 'Último tercio']] },
+    defensiva: { label: 'Fase defensiva', fields: 'defensiva', moments: [['bloqueAlto', 'Bloque alto'], ['bloqueMedio', 'Bloque medio'], ['bloqueBajo', 'Bloque bajo']] },
+    transiciones: { label: 'Transiciones ofensivas y defensivas', fields: 'trans', moments: [['transOf', 'Transición ofensiva (al recuperar)'], ['transDef', 'Transición defensiva (al perder)']] },
+  };
+  const FUNDAMENTOS = ['Fijar para liberar', 'Atraer para progresar', 'Tercer hombre', 'Pared', 'Apoyo y desmarque', 'Amplitud y profundidad', 'Superioridad numérica', 'Superioridad posicional', 'Superioridad cualitativa', 'Cambio de orientación', 'Juego entre líneas', 'Ataque al espacio', 'Desmarque de ruptura', 'Conducción para fijar', 'Llegada de segunda línea', 'Ocupación de carriles', 'Temporizar', 'Basculación', 'Cobertura', 'Permuta', 'Vigilancias', 'Presión tras pérdida', 'Repliegue intensivo', 'Orientar la presión hacia fuera', 'Cerrar líneas de pase interiores', 'Salto a presionar', 'Basculación y cierre del lado fuerte', 'Contraataque', 'Primer pase fuera de zona de presión', 'Ataque rápido'];
+  function blankWork() {
+    const moments = {}; for (const g of Object.values(MODEL_MOMENTS)) for (const [k] of g.moments) moments[k] = { fund: '', expl: '', players: [] };
+    return { lines: { def: '', mid: '', att: '' }, ideas: ['', '', '', '', ''], systemText: '', moments };
+  }
+  // Cuaderno de ejemplo (demo y pruebas): usa jugadores reales de la plantilla
+  function exampleWork(players) {
+    const by = (line) => players.filter((p) => POSITIONS[p.pos].line === line).sort((a, b) => playerRating(b) - playerRating(a)).map((p) => p.id);
+    const D = by('def'), M = by('mid'), A = by('att'), P = by('gk');
+    const w = blankWork();
+    w.lines = { def: 'Centrales rápidos y con buena salida de balón; los laterales suben bien pero sufren defendiendo a la espalda.', mid: 'Un pivote ordenado y dos interiores con mucho recorrido; nos falta un mediocentro que pise área.', att: 'Extremos desequilibrantes en el uno contra uno y un delantero que fija centrales y gana duelos aéreos.' };
+    w.ideas = ['Querer el balón y salir jugando desde atrás', 'Atacar por fuera con los extremos abiertos', 'Presionar fuerte tras pérdida durante cinco segundos', 'Defender en bloque medio y juntos', 'Llegar al área con segunda línea', ''];
+    w.ideas = w.ideas.slice(0, 5);
+    w.systemText = 'Jugamos 1-4-3-3 porque tenemos tres buenos medios y dos extremos rápidos que dan amplitud.';
+    const pick = { salida: [P[0], D[0], D[1], M[0]], progresion: [M[0], M[1], D[2]], ultimo: [A[0], A[1], M[1]], bloqueAlto: [A[0], A[1], M[1]], bloqueMedio: [M[0], M[1], D[0]], bloqueBajo: [D[0], D[1], M[0]], transOf: [M[1], A[0], A[1]], transDef: [M[0], D[0], D[1]] };
+    for (const [k, ids] of Object.entries(pick)) w.moments[k] = { fund: FUNDAMENTOS[Object.keys(pick).indexOf(k) * 3 % FUNDAMENTOS.length], expl: 'Explicación de ejemplo: qué buscamos en este momento, cómo lo hacemos y por qué encaja con estos jugadores.', players: ids.filter(Boolean) };
+    return w;
+  }
   function defaultModel() {
     return {
       attStructure: '1-4-3-3', buildUp: 'mixto', cbHeight: 'media', fullbacks: 'profundos', pivots: 'escalonados', width: '3', tempo: 'medio', progression: 'mixta', finishing: 'juego interior',
       defStructure: '1-4-3-3', blockHeight: 'medio', pressType: 'zonal', pressOrientation: 'hacia fuera', coverage: 'coberturas cortas', depthControl: 'línea media',
       afterLoss: 'mixta', restDefense: '3+1', afterRecovery: 'ataque rápido', firstPass: 'fuera de zona de presión',
       cornerOf: 'segundo palo', cornerDef: 'mixto', freeKicks: 'jugada ensayada', throwIns: 'corto y conservar',
-      notes: { ofensiva: '', defensiva: '', transAD: '', transDA: '', abp: '' }, identity: '', updatedAt: null,
+      notes: { ofensiva: '', defensiva: '', transAD: '', transDA: '', abp: '' }, identity: '', updatedAt: null, work: blankWork(),
     };
   }
   // Indicadores relevantes según el modelo (para evaluar coherencia)
@@ -1094,9 +1118,9 @@
     makeRng, hashSeed, clamp, avg, round1,
     ATTR_GROUPS, ALL_ATTRS, ATTR_LABEL, POSITIONS, POS_KEYS, ARCHETYPES, FORMATIONS, ATT_STRUCTURES, INDICATORS, IND_LABEL, IND_START,
     TASK_TYPES, OBJ_PROFILE, PROVOCATIONS, PROV, SESSION_TYPES, DAYS, MODEL_FIELDS, COND_ACTIONS, COND_WHEN, TASK_LIBRARY, DEFAULT_WEIGHTS,
-    defaultModel, modelRelevance, genSquad, playerRating, posFit, squadPotential, strengthsWeaknesses, autoLineup, roundRobin,
+    defaultModel, exampleWork, modelRelevance, genSquad, playerRating, posFit, squadPotential, strengthsWeaknesses, autoLineup, roundRobin,
     evaluateTask, evaluateSession, evaluateMicrocycle, computeLearning, evaluatePlan, evaluateCoherence, evaluateAdaptation, evaluateReflection,
     simulateMatch, tacticsFrom, taskPlayers, sessionLoad: load,
-    PHASE_SPACES, MODEL_DEMANDS, spaceValue, squadSpaces, validateModel,
+    PHASE_SPACES, MODEL_DEMANDS, spaceValue, squadSpaces, validateModel, MODEL_MOMENTS, FUNDAMENTOS, blankWork,
   });
 })(typeof window !== 'undefined' ? window : globalThis);

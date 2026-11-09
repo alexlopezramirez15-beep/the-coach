@@ -20,18 +20,18 @@
   /* ───── Presentación de la plantilla ───── */
   V.presentacion = function (c) {
     const t = c.team; const first = !t.squadSeenAt;
-    return `<div class="page-head"><div class="eyebrow">${first ? 'Paso 1 de 2 antes de competir' : 'Tu plantilla'}</div><h1>Presentación de la plantilla</h1>
-      <p class="muted">${esc(t.name)} · 18 jugadores. Estúdialos antes de diseñar tu modelo de juego: el modelo se validará contra lo que estos jugadores saben hacer.</p></div>
+    return `<div class="page-head"><div class="eyebrow">${first ? 'Paso 1 de 2 antes de competir' : 'Tu plantilla'}</div><div class="row">${UI.teamBadge(t, 52)}<h1>Presentación de la plantilla</h1></div>
+      <p class="muted">${esc(t.name)} · 18 jugadores. Empieza por la <a href="#club" data-go="club">historia del club</a> y después abre cada jugador para leer su informe y completar su DAFO. Estúdialos antes de diseñar tu modelo de juego: el modelo se validará contra lo que estos jugadores saben hacer.</p></div>
     ${first ? '<div class="notice warn"><b>Para empezar:</b> estudia tus 18 jugadores y pulsa <b>«He revisado la plantilla»</b>. Después diseñarás y presentarás tu modelo de juego; al presentarlo se desbloquea la planificación de la semana (microciclo, tareas, rival, plan y alineación).</div>' : ''}
-    <div class="row wrap"><button class="btn" data-act="downloadReport">Descargar informe de la plantilla</button>${first ? '<button class="btn primary" data-act="squadSeen">He revisado la plantilla: diseñar mi modelo de juego</button>' : '<button class="btn ghost" data-go="modelo">Ir al modelo de juego</button>'}</div>
+    <div class="row wrap"><button class="btn" data-go="club">Leer la historia del club</button><button class="btn" data-act="downloadReport">Descargar informe de la plantilla</button>${first ? '<button class="btn primary" data-act="squadSeen">He revisado la plantilla: diseñar mi modelo de juego</button>' : '<button class="btn ghost" data-go="modelo">Ir al modelo de juego</button>'}</div>
     <h2 class="sec">Perfil de la plantilla por espacios de fase</h2>
     <p class="small muted">Media del once inicial en las capacidades que exige cada espacio de fase (marco de Método Pro). Los porteros no se incluyen.</p>
     ${spacesPanel(t)}
     ${byLine(t.players).map(([l, ps]) => `<h2 class="sec">${l} <small class="muted">${ps.length}</small></h2><div class="grid g3">${ps.map((p) => { const sw = TC.strengthsWeaknesses(p); const r = TC.playerRating(p); return `<article class="card pl" data-go="jugador" data-p='{"id":"${p.id}"}' tabindex="0">
-      <div class="pl-head"><span class="pl-r ${UI.attrClass(r)}">${r}</span><div><b>${esc(p.name)}</b><small>${esc(TC.POSITIONS[p.pos].label)}${p.sec.length ? ' · también ' + p.sec.join(', ') : ''}</small></div><span class="pos ${TC.POSITIONS[p.pos].line}">${p.pos}</span></div>
+      <div class="pl-head"><span class="bp-face">${G.TCArt.portrait(p, t, 48)}</span><span class="pl-r ${UI.attrClass(r)}">${r}</span><div><b>${esc(p.name)}</b><small>${esc(TC.POSITIONS[p.pos].label)}${p.sec.length ? ' · también ' + p.sec.join(', ') : ''}</small></div><span class="pos ${TC.POSITIONS[p.pos].line}">${p.pos}</span></div>
       <p class="small muted">${esc(p.profile)} · ${p.age} años · ${p.height} cm · pierna ${p.foot.toLowerCase()}</p>
       <div class="g4mini">${Object.keys(TC.ATTR_GROUPS).map((g) => `<div><small>${GROUP_SHORT[g]}</small><b class="${UI.attrClass(gAvg(p, g))}">${gAvg(p, g)}</b></div>`).join('')}</div>
-      <div class="small"><span class="up">▲</span> ${sw.top.slice(0, 2).map(esc).join(', ')}<br><span class="down">▼</span> ${sw.low.slice(0, 2).map(esc).join(', ')}</div></article>`; }).join('')}</div>`).join('')}
+      <div class="small row between"><span class="muted">Informe y DAFO</span>${(() => { const d = (S.getNotebook(t.id).dafo || {})[p.id] || {}; const n = ['f', 'd', 'a', 'o'].filter((k) => (d[k] || '').trim().length >= 3).length; return UI.pill('DAFO ' + n + '/4', n === 4 ? 'ok' : n ? 'warn' : ''); })()}</div></article>`; }).join('')}</div>`).join('')}
     ${first ? '<div class="sticky-actions"><span class="muted small">¿Ya conoces a tus jugadores?</span><button class="btn primary" data-act="squadSeen">He revisado la plantilla: diseñar mi modelo de juego</button></div>' : ''}`;
   };
   A.squadSeen = () => { const c = UI.ctx(); S.markSquadSeen(c.team.id); UI.toast('Ahora diseña tu modelo de juego a partir de estos jugadores.'); UI.go('modelo'); };
