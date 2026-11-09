@@ -133,7 +133,7 @@
     // Orden obligatorio: primero conocer la plantilla, después presentar el modelo de juego
     const GATED = ['microciclo', 'biblioteca', 'rival', 'plan', 'alineacion', 'tarea', 'partido'];
     let locked = [];
-    if (c.user.role === 'student' && c.team) {
+    if (c.user.role === 'student' && c.team && !c.user.noGates) {
       const req = view;
       if (!c.team.squadSeenAt) { locked = nav.flatMap((g) => g[1].map((x) => x[0])).filter((k) => !['presentacion', 'estado', 'plantilla', 'club'].includes(k)); if (!['estado', 'plantilla', 'jugador', 'club'].includes(view)) view = 'presentacion'; }
       else if (!c.team.model.submittedAt) { locked = GATED; if (GATED.includes(view)) { UI.state.gated = view; view = 'modelo'; } }
