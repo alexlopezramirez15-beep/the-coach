@@ -105,12 +105,12 @@
 
   const COACH_NAV = [
     ['Competición', [['inicio', 'Inicio'], ['partido', 'Centro de partido'], ['clasificacion', 'Clasificación'], ['ranking', 'Ranking de entrenadores'], ['historial', 'Historial']]],
-    ['Mi equipo', [['equipo', 'Mi equipo'], ['plantilla', 'Plantilla'], ['modelo', 'Modelo de juego'], ['pizarra', 'Pizarra táctica']]],
+    ['Mi equipo', [['presentacion', 'Presentación de plantilla'], ['equipo', 'Mi equipo'], ['plantilla', 'Plantilla'], ['modelo', 'Modelo de juego'], ['pizarra', 'Pizarra táctica']]],
     ['Semana', [['microciclo', 'Microciclo'], ['biblioteca', 'Biblioteca de tareas'], ['rival', 'Análisis del rival'], ['plan', 'Plan de partido'], ['alineacion', 'Alineación']]],
     ['Proyecto', [['estado', 'Estado del desarrollo']]],
   ];
   const TEACHER_NAV = [
-    ['Clase', [['profe', 'Panel del profesor'], ['profe-jornadas', 'Jornadas'], ['profe-entregas', 'Entregas'], ['profe-evaluar', 'Evaluaciones']]],
+    ['Clase', [['profe', 'Panel del profesor'], ['profe-alumnos', 'Alumnos y accesos'], ['profe-jornadas', 'Jornadas'], ['profe-entregas', 'Entregas'], ['profe-evaluar', 'Evaluaciones']]],
     ['Competición', [['clasificacion', 'Clasificación'], ['ranking', 'Ranking académico'], ['profe-jugadores', 'Jugadores'], ['profe-config', 'Configuración']]],
     ['Proyecto', [['estado', 'Estado del desarrollo']]],
   ];
@@ -121,16 +121,22 @@
     const c = UI.ctx();
     if (!c.user) { root.innerHTML = UI.views.login(c); return; }
     let view = UI.state.view;
-    if (c.user.role === 'student' && !c.team) view = 'unirse';
+    if (c.user.role === 'student' && !c.team) view = 'espera';
+    // Orden obligatorio: primero conocer la plantilla, después presentar el modelo de juego
+    const GATED = ['microciclo', 'biblioteca', 'rival', 'plan', 'alineacion', 'tarea', 'partido'];
+    if (c.user.role === 'student' && c.team) {
+      if (!c.team.squadSeenAt && view !== 'estado') view = 'presentacion';
+      else if (!c.team.model.submittedAt && GATED.includes(view)) { UI.state.gated = view; view = 'modelo'; }
+    }
     const nav = c.user.role === 'teacher' ? TEACHER_NAV : COACH_NAV;
-    const allowed = nav.flatMap((g) => g[1].map((x) => x[0])).concat(['jugador', 'tarea', 'informe', 'unirse', 'nueva-comp', 'profe-entrega', 'logros']);
+    const allowed = nav.flatMap((g) => g[1].map((x) => x[0])).concat(['jugador', 'tarea', 'informe', 'espera', 'nueva-comp', 'profe-entrega', 'profe-alumno', 'logros']);
     if (!view || !allowed.includes(view) || !UI.views[view]) view = c.user.role === 'teacher' ? 'profe' : 'inicio';
-    if (c.user.role === 'teacher' && !c.comp && !['profe', 'nueva-comp', 'estado'].includes(view)) view = 'profe';
+    if (c.user.role === 'teacher' && !c.comp && !['profe', 'nueva-comp', 'estado', 'profe-alumnos', 'profe-alumno'].includes(view)) view = 'profe';
     UI.state.view = view;
     let body;
     try { body = UI.views[view](c, UI.state.params); }
     catch (e) { console.error(e); body = `<div class="card"><h2>No se pudo mostrar esta pantalla</h2><p class="muted">${esc(e.message)}</p></div>`; }
-    const navHtml = view === 'unirse' ? '' : nav.map(([g, items]) => `<div class="nav-group"><div class="nav-title">${esc(g)}</div>${items.map(([k, l]) => `<a href="#${k}" data-go="${k}" class="${k === view || (k === 'plantilla' && view === 'jugador') || (k === 'microciclo' && view === 'tarea') || (k === 'partido' && view === 'informe') || (k === 'profe-entregas' && view === 'profe-entrega') ? 'on' : ''}">${esc(l)}</a>`).join('')}</div>`).join('');
+    const navHtml = view === 'espera' ? '' : nav.map(([g, items]) => `<div class="nav-group"><div class="nav-title">${esc(g)}</div>${items.map(([k, l]) => `<a href="#${k}" data-go="${k}" class="${k === view || (k === 'plantilla' && view === 'jugador') || (k === 'microciclo' && view === 'tarea') || (k === 'partido' && view === 'informe') || (k === 'profe-entregas' && view === 'profe-entrega') ? 'on' : ''}">${esc(l)}</a>`).join('')}</div>`).join('');
     const ctxLabel = c.user.role === 'student'
       ? (c.team ? `${UI.teamBadge(c.team)} <span><b>${esc(c.team.name)}</b><small>${esc(c.comp.name)} · J${c.comp.currentRound}/${c.comp.config.rounds}</small></span>` : '')
       : (c.comp ? `<span><b>${esc(c.comp.name)}</b><small>Código ${esc(c.comp.code)} · J${c.comp.currentRound}/${c.comp.config.rounds}</small></span>` : '<span><b>Sin competición</b></span>');
@@ -139,9 +145,9 @@
       <header class="topbar">
         <a class="brand" href="#inicio" data-go="${c.user.role === 'teacher' ? 'profe' : 'inicio'}"><span class="logo">TC</span><span class="brand-t"><b>THE COACH</b><small>Manager Academy</small></span></a>
         <div class="ctx">${ctxLabel}${compSwitch}</div>
-        <div class="who"><span class="role ${c.user.role}">${c.user.role === 'teacher' ? 'Profesor' : 'Entrenador'}</span><span class="uname">${esc(c.user.name)}</span><button class="btn ghost sm" data-act="switchProfile">Cambiar perfil</button></div>
+        <div class="who"><span class="role ${c.user.superadmin ? 'admin' : c.user.role}">${c.user.superadmin ? 'Superadmin' : c.user.role === 'teacher' ? 'Profesor' : 'Entrenador'}</span><span class="uname">${esc(c.user.name)}</span><button class="btn ghost sm" data-act="switchProfile">Salir</button></div>
       </header>
-      <div class="shell ${view === 'unirse' ? 'nonav' : ''}">
+      <div class="shell ${view === 'espera' ? 'nonav' : ''}">
         ${navHtml ? `<nav class="side" aria-label="Navegación">${navHtml}</nav>` : ''}
         <main id="main" class="main view-${view}">${body}</main>
       </div>`;
@@ -154,70 +160,65 @@
 
   /* ───── Acceso ───── */
   UI.views.login = function () {
-    const users = S.users();
     const hasDemo = S.load().competitions.some((c) => c.demo);
+    const tab = UI.state.loginTab || 'alumno';
+    const adminExists = S.adminExists();
+    const tabs = [['alumno', 'Solicitar acceso'], ['codigo', 'Tengo mi código'], ['admin', 'Administrador']];
+    let form = '';
+    if (tab === 'alumno') form = UI.state.requested
+      ? `<div class="notice ok"><b>Solicitud enviada.</b><br>Tu profesor revisará tu solicitud y te pasará un código personal (formato ABCD-EFGH). Cuando lo tengas, entra en «Tengo mi código» con tu email.</div><button class="btn ghost" data-act="loginTab" data-t="codigo">Ya tengo el código</button>`
+      : `<p class="muted small">Regístrate con tu nombre y tu email. No podrás entrar hasta que tu profesor apruebe la solicitud y te pase tu código.</p>
+        <form data-submit="requestAccess" class="stack"><label class="field"><span>Nombre y apellidos</span><input id="ra-name" name="name" required minlength="3" autocomplete="name"></label>
+        <label class="field"><span>Email</span><input id="ra-email" name="email" type="email" required autocomplete="email"></label>
+        <button class="btn primary" type="submit">Enviar solicitud</button></form>`;
+    if (tab === 'codigo') form = `<p class="muted small">Entra con el email con el que te registraste y el código que te ha dado tu profesor.</p>
+        <form data-submit="loginCode" class="stack"><label class="field"><span>Email</span><input id="lc-email" name="email" type="email" required autocomplete="email"></label>
+        <label class="field"><span>Código de acceso</span><input id="lc-code" name="code" required placeholder="ABCD-EFGH" maxlength="9" style="text-transform:uppercase;letter-spacing:.15em" autocomplete="one-time-code"></label>
+        <button class="btn primary" type="submit">Entrar</button></form>`;
+    if (tab === 'admin') form = adminExists
+      ? `<form data-submit="adminLogin" class="stack"><label class="field"><span>Email</span><input id="al-email" name="email" type="email" required></label><label class="field"><span>Contraseña</span><input id="al-pass" name="password" type="password" required></label><button class="btn primary" type="submit">Entrar como administrador</button></form>`
+      : `<p class="muted small">Primera vez: crea la cuenta de superadministrador. Verá todas las competiciones, equipos, entregas y alumnos, y es quien aprueba los accesos.</p>
+        <form data-submit="adminSetup" class="stack"><label class="field"><span>Nombre</span><input id="as-name" name="name" required></label><label class="field"><span>Email</span><input id="as-email" name="email" type="email" required></label><label class="field"><span>Contraseña (mín. 8)</span><input id="as-pass" name="password" type="password" minlength="8" required></label><button class="btn primary" type="submit">Crear superadministrador</button></form>`;
     return `
     <div class="login">
       <section class="login-hero">
         <div class="brand big"><span class="logo">TC</span><span class="brand-t"><b>THE COACH</b><small>Manager Academy</small></span></div>
         <h1>Piensa como un entrenador.<br>Compite con tu clase.</h1>
         <p>Simulador educativo de gestión y competición táctica para el CFGM de Técnico Deportivo en Fútbol. Lo que trabajas durante la semana decide lo que tu equipo es capaz de hacer el día del partido.</p>
-        <ol class="flow">
-          <li>Modelo de juego</li><li>Microciclo</li><li>Tareas</li><li>Rival</li><li>Plan de partido</li><li>Simulación</li><li>Análisis</li>
-        </ol>
+        <ol class="flow"><li>Conoce tu plantilla</li><li>Modelo de juego</li><li>Microciclo</li><li>Tareas</li><li>Rival</li><li>Plan de partido</li><li>Simulación</li><li>Análisis</li></ol>
         <div class="demo-box">
           <h3>Modo demostración</h3>
-          <p class="muted">Liga de 8 equipos, 20 jugadores por plantilla y 7 jornadas. Tu equipo (CF Alameda) tiene la semana 1 preparada para que pruebes el flujo completo.</p>
+          <p class="muted">Liga de 8 equipos con 18 jugadores y 7 jornadas. Hay dos solicitudes de alumnos de ejemplo para probar la aprobación.</p>
           <div class="row wrap">
             <button class="btn primary" data-act="demoCoach">${hasDemo ? 'Entrar como entrenador demo' : 'Crear demo y entrar como entrenador'}</button>
-            <button class="btn" data-act="demoTeacher">${hasDemo ? 'Entrar como profesor demo' : 'Crear demo y entrar como profesor'}</button>
+            <button class="btn" data-act="demoTeacher">${hasDemo ? 'Entrar como superadmin demo' : 'Crear demo y entrar como superadmin'}</button>
             ${hasDemo ? '<button class="btn ghost" data-act="demoReset">Reiniciar la demo</button>' : ''}
           </div>
         </div>
       </section>
       <section class="login-panel">
         <div class="card">
-          <h2>Crear perfil</h2>
-          <form data-submit="register" class="stack">
-            <label class="field"><span>Nombre</span><input id="reg-name" name="name" required minlength="2" placeholder="Nombre y apellido"></label>
-            <fieldset class="roles"><legend>Rol</legend>
-              <label class="role-opt"><input type="radio" name="role" value="student" checked><span><b>Alumno / entrenador</b><small>Dirige un equipo y entrega su planificación.</small></span></label>
-              <label class="role-opt"><input type="radio" name="role" value="teacher"><span><b>Profesor / administrador</b><small>Crea competiciones, activa jornadas y evalúa.</small></span></label>
-            </fieldset>
-            <label class="field"><span>Código de clase (alumnos)</span><input id="reg-code" name="code" placeholder="Ej. 7KQ2MD" maxlength="6" style="text-transform:uppercase"></label>
-            <button class="btn primary" type="submit">Entrar</button>
-          </form>
+          <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" class="tab ${k === tab ? 'on' : ''}" data-act="loginTab" data-t="${k}">${l}</button>`).join('')}</div>
+          ${form}
         </div>
-        ${users.length ? `<div class="card"><h3>Perfiles en este dispositivo</h3><div class="profiles">${users.map((u) => `<button class="profile" data-act="loginAs" data-id="${u.id}"><span class="role ${u.role}">${u.role === 'teacher' ? 'Profesor' : 'Entrenador'}</span><b>${esc(u.name)}</b></button>`).join('')}</div>
-          <p class="note">Versión de prueba: los perfiles no usan contraseña y los datos se guardan en este navegador. El acceso con credenciales llegará con el servidor.</p></div>` : ''}
+        <p class="note">Versión de prueba: los datos se guardan en este navegador. Con el servidor compartido, cada alumno se registrará desde su propio dispositivo.</p>
       </section>
     </div>`;
   };
-  UI.actions.register = (f) => {
-    const d = UI.formData(f);
-    S.register(d.name, d.role);
-    if (d.role === 'student' && d.code) { try { S.joinWithCode(d.code); } catch (e) { UI.toast(e.message, 'bad'); } }
-    UI.state.view = null; UI.render();
-  };
+  UI.actions.loginTab = (el) => { UI.state.loginTab = el.dataset.t; UI.state.requested = false; UI.render(); };
+  UI.actions.requestAccess = (f) => { const d = UI.formData(f); S.requestAccess(d.name, d.email); UI.state.requested = true; UI.render(); };
+  UI.actions.loginCode = (f) => { const d = UI.formData(f); S.loginWithCode(d.email, d.code); UI.state.view = null; UI.state.teamId = null; UI.render(); };
+  UI.actions.adminLogin = (f) => { const d = UI.formData(f); S.adminLogin(d.email, d.password); UI.state.view = 'profe'; UI.state.compId = null; UI.render(); };
+  UI.actions.adminSetup = (f) => { const d = UI.formData(f); S.adminSetup(d.name, d.email, d.password); UI.toast('Superadministrador creado.'); UI.state.view = 'profe'; UI.render(); };
   UI.actions.loginAs = (el) => { S.loginAs(el.dataset.id); UI.state.view = null; UI.state.teamId = null; UI.state.compId = null; UI.render(); };
   function ensureDemo() { let comp = S.load().competitions.find((c) => c.demo); if (!comp) comp = G.TCDemo.createDemo().comp; return comp; }
   UI.actions.demoCoach = () => { ensureDemo(); const u = S.users().find((x) => x.demo === 'coach'); S.loginAs(u.id); UI.state.teamId = null; UI.go('inicio'); };
   UI.actions.demoTeacher = () => { const comp = ensureDemo(); const u = S.users().find((x) => x.demo === 'teacher'); S.loginAs(u.id); UI.state.compId = comp.id; UI.go('profe'); };
-  UI.actions.demoReset = () => UI.ask('Reiniciar la demo', 'Se borran todos los datos de la liga demo (resultados, entregas y evaluaciones) y se vuelve a crear desde cero.', 'Reiniciar demo', () => { G.TCDemo.createDemo(); UI.toast('Demo reiniciada.'); UI.render(); }, true);
+  UI.actions.demoReset = () => UI.ask('Reiniciar la demo', 'Se borran todos los datos de la liga demo (resultados, entregas y evaluaciones) y se vuelve a crear desde cero.', 'Reiniciar demo', () => { G.TCDemo.createDemo(); S.logout(); UI.toast('Demo reiniciada.'); UI.render(); }, true);
 
-  UI.views.unirse = function (c) {
-    return `<div class="narrow"><div class="card"><h2>Únete a tu competición</h2><p class="muted">Pide a tu profesor el código de clase de 6 caracteres.</p>
-      <form data-submit="join" class="stack"><label class="field"><span>Código</span><input id="join-code" name="code" maxlength="6" required style="text-transform:uppercase" placeholder="7KQ2MD" data-input="joinPreview"></label>
-      <div id="join-teams"></div>
-      <button class="btn primary" type="submit">Unirme</button></form></div>
-      <p class="note">¿Quieres probar sin código? <a href="#" data-act="demoCoach">Entra en la demo como entrenador</a>.</p></div>`;
+  UI.views.espera = function (c) {
+    return `<div class="narrow"><div class="card"><h2>Tu cuenta está activa</h2><p class="muted">Todavía no tienes un equipo asignado. Tu profesor te lo asignará desde el panel de alumnos.</p><button class="btn ghost" data-act="switchProfile">Salir</button></div></div>`;
   };
-  UI.actions.joinPreview = (el) => {
-    const r = S.freeTeams(el.value); const box = UI.$('#join-teams');
-    if (!r) { box.innerHTML = ''; return; }
-    box.innerHTML = `<p><b>${esc(r.comp.name)}</b>: ${r.teams.length} equipos libres.</p>` + (r.teams.length ? `<label class="field"><span>Equipo</span><select name="teamId">${r.teams.map((t) => UI.opt(t.id, t.name)).join('')}</select></label>` : '');
-  };
-  UI.actions.join = (f) => { const d = UI.formData(f); const t = S.joinWithCode(d.code, d.teamId); UI.state.teamId = t.id; UI.toast(`Ya diriges ${t.name}.`); UI.go('equipo'); };
 
   /* ───── Estado del desarrollo ───── */
   UI.views.estado = function () {

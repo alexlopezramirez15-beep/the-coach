@@ -88,10 +88,10 @@
     DC: [['Delantero de área', { finalizacion: 14, aereo: 12, fuerza: 8, velocidad: -10, asociacion: -6 }], ['Delantero de apoyo', { asociacion: 14, control: 12, pase: 8, finalizacion: -6, aereo: -8 }], ['Delantero de ruptura', { velocidad: 14, aceleracion: 12, espacios: 8, aereo: -10, control: -6 }]],
   };
 
-  // Plantilla tipo (20). [posición, nivel base, secundarias]
+  // Plantilla tipo (18): 11 titulares + 7 suplentes
   const SQUAD_TEMPLATE = [
-    ['POR', 66], ['POR', 55], ['DFC', 66], ['DFC', 65], ['DFC', 57], ['DFC', 54], ['LD', 65], ['LD', 55], ['LI', 65], ['MCD', 66], ['MCD', 56],
-    ['MC', 66], ['MC', 65], ['MC', 56], ['MCO', 64], ['ED', 66], ['ED', 56], ['EI', 65], ['DC', 66], ['DC', 57],
+    ['POR', 66], ['POR', 55], ['DFC', 66], ['DFC', 65], ['DFC', 57], ['LD', 65], ['LD', 56], ['LI', 65], ['MCD', 66], ['MCD', 56],
+    ['MC', 66], ['MC', 65], ['MCO', 64], ['ED', 66], ['ED', 56], ['EI', 65], ['DC', 66], ['DC', 57],
   ];
 
   const FIRST = ['Álex', 'Hugo', 'Mario', 'Iker', 'Pol', 'Unai', 'Leo', 'Nico', 'Dani', 'Rubén', 'Marc', 'Aitor', 'Jon', 'Sergio', 'Adrián', 'Pablo', 'Oriol', 'Gerard', 'Iván', 'Lucas', 'Bruno', 'Raúl', 'Víctor', 'Joel', 'Enzo', 'Ander', 'Gael', 'Eric', 'Samuel', 'Martí', 'Izan', 'Arnau', 'Rayan', 'Thiago', 'Biel', 'Mateo', 'Óscar', 'Asier', 'Jordi', 'Xabi', 'Youssef', 'Kevin', 'Saúl', 'Íñigo', 'Ferran', 'Moha', 'Teo', 'Carles'];
@@ -950,6 +950,130 @@
     return out;
   }
 
+
+  /* ───────────── Espacios de fase (Método Pro) y validación del modelo ───────────── */
+  // Intervención: acción directa sobre el balón. Ayuda mutua: apoyos, coberturas, paredes, tercer hombre.
+  // Cooperación: sostener la estructura, fijar, amplitud, profundidad y equilibrio.
+  const PHASE_SPACES = {
+    intervencion: { label: 'Intervención', attrs: ['control', 'regate', 'conduccion', 'perfil', 'entrada', 'fuerza', 'agilidad', 'confianzaAttr'], desc: 'Actuar directamente sobre el balón: recibir presionado, proteger, disputar, recuperar.' },
+    ayuda: { label: 'Ayuda mutua', attrs: ['pase', 'asociacion', 'percepcion', 'orientacion', 'anticipacion', 'decisiones'], desc: 'Relación inmediata con la siguiente acción: apoyos, coberturas, paredes y tercer hombre.' },
+    cooperacion: { label: 'Cooperación', attrs: ['espacios', 'ocupacion', 'intDefensiva', 'colectivo', 'concentracion', 'superioridad'], desc: 'Sostener la estructura sin balón cerca: fijar, dar amplitud y profundidad, equilibrio y vigilancias.' },
+  };
+  function spaceValue(p, sp) { return avg(PHASE_SPACES[sp].attrs.map((a) => p.attrs[a])); }
+  function squadSpaces(players) {
+    const lu = autoLineup(players, '1-4-3-3');
+    const xi = lu.slots.map((id) => players.find((p) => p.id === id)).filter(Boolean).filter((p) => p.pos !== 'POR');
+    const out = {};
+    for (const sp of Object.keys(PHASE_SPACES)) {
+      const byLine = {};
+      for (const line of ['def', 'mid', 'att']) { const xs = xi.filter((p) => POSITIONS[p.pos].line === line); byLine[line] = Math.round(avg(xs.map((p) => spaceValue(p, sp)))); }
+      const ranked = players.filter((p) => p.pos !== 'POR').map((p) => [p, spaceValue(p, sp)]).sort((a, b) => b[1] - a[1]);
+      out[sp] = { value: round1(avg(xi.map((p) => spaceValue(p, sp)))), byLine, best: ranked.slice(0, 3).map((x) => x[0].name), worst: ranked.slice(-2).map((x) => x[0].name) };
+    }
+    return out;
+  }
+  const LINE_POS = { gk: ['POR'], def: ['DFC', 'LD', 'LI'], cb: ['DFC'], fb: ['LD', 'LI'], piv: ['MCD'], mid: ['MCD', 'MC', 'MCO'], int: ['MC', 'MCO'], wing: ['ED', 'EI'], wide: ['LD', 'LI', 'ED', 'EI'], att: ['ED', 'EI', 'DC', 'MCO'], fw: ['DC'], build: ['POR', 'DFC', 'MCD'], outfield: ['DFC', 'LD', 'LI', 'MCD', 'MC', 'MCO', 'ED', 'EI', 'DC'] };
+  // Exigencias de cada decisión del modelo: quién la ejecuta, qué capacidades y en qué espacio de fase
+  const MODEL_DEMANDS = {
+    buildUp: {
+      corto: { who: 'build', attrs: ['control', 'perfil', 'agilidad', 'pase', 'percepcion', 'orientacion'], need: 64, space: 'intervencion+ayuda', why: 'Salir en corto exige que portero, centrales y pivote reciban presionados (intervención) y que haya apoyos y tercer hombre cerca del poseedor (ayuda mutua).' },
+      mixto: { who: 'build', attrs: ['pase', 'percepcion', 'decisiones', 'control'], need: 60, space: 'ayuda', why: 'Combinar corto y largo exige leer cuándo hay apoyo libre y cuándo no (percepción y decisión).' },
+      directo: { who: 'fw', attrs: ['aereo', 'fuerza', 'control', 'perfil'], need: 62, space: 'intervencion', why: 'El juego directo exige ganar el primer duelo arriba y proteger el balón (intervención) para que lleguen las segundas jugadas.' },
+    },
+    cbHeight: { alta: { who: 'cb', attrs: ['pase', 'conduccion', 'velocidad', 'orientacion'], need: 62, space: 'ayuda', why: 'Centrales altos en inicio necesitan conducir y dar pases de progresión, y velocidad para corregir si se pierde el balón.' } },
+    fullbacks: {
+      profundos: { who: 'fb', attrs: ['velocidad', 'resistencia', 'repetir', 'espacios'], need: 64, space: 'cooperacion', why: 'Laterales profundos dan amplitud y profundidad (cooperación) y deben repetir esfuerzos de ida y vuelta.' },
+      interiores: { who: 'fb', attrs: ['pase', 'asociacion', 'orientacion', 'decisiones', 'percepcion'], need: 63, space: 'ayuda', why: 'El lateral interior se convierte en apoyo por dentro: perfil, pase y lectura de la presión (ayuda mutua).' },
+      conservadores: { who: 'fb', attrs: ['intDefensiva', 'concentracion', 'anticipacion'], need: 60, space: 'cooperacion', why: 'Laterales conservadores sostienen las vigilancias y el equilibrio defensivo (cooperación).' },
+    },
+    attStructure: {
+      '1-3-2-5': { who: 'wide', attrs: ['resistencia', 'velocidad', 'espacios', 'ocupacion'], need: 63, space: 'cooperacion', why: 'Ocupar cinco carriles exige jugadores de banda que fijen y den amplitud constante (cooperación).' },
+      '1-2-3-5': { who: 'cb', attrs: ['velocidad', 'anticipacion', 'concentracion', 'intDefensiva'], need: 65, space: 'cooperacion', why: 'Con sólo dos jugadores por detrás del balón, los centrales defienden mucho espacio en vigilancias: velocidad y anticipación.' },
+      '1-3-1-4-2': { who: 'int', attrs: ['asociacion', 'espacios', 'pase', 'decisiones'], need: 62, space: 'ayuda', why: 'La doble línea de cuatro exige interiores que se asocien entre líneas.' },
+    },
+    progression: {
+      interior: { who: 'mid', attrs: ['pase', 'asociacion', 'percepcion', 'orientacion', 'control'], need: 64, space: 'ayuda', why: 'Progresar por dentro exige apoyos orientados, paredes y tercer hombre en espacios reducidos (ayuda mutua).' },
+      exterior: { who: 'wide', attrs: ['regate', 'velocidad', 'superioridad', 'pase', 'conduccion'], need: 63, space: 'intervencion', why: 'Progresar por fuera exige ganar duelos 1c1 en banda y centrar con calidad (intervención).' },
+      mixta: { who: 'outfield', attrs: ['pase', 'decisiones', 'percepcion'], need: 60, space: 'ayuda', why: 'Alternar carriles exige leer dónde está la superioridad.' },
+    },
+    tempo: {
+      alto: { who: 'outfield', attrs: ['pase', 'decisiones', 'velocidad', 'repetir'], need: 63, space: 'ayuda', why: 'Circular rápido exige decidir antes de recibir y desplazarse continuamente para ofrecer apoyos.' },
+      pausado: { who: 'mid', attrs: ['control', 'percepcion', 'decisiones', 'concentracion'], need: 62, space: 'intervencion+ayuda', why: 'La posesión paciente exige proteger el balón bajo presión y no precipitarse.' },
+    },
+    finishing: {
+      centros: { who: 'fw', attrs: ['aereo', 'finalizacion', 'fuerza', 'espacios'], need: 63, space: 'intervencion', why: 'Finalizar con centros exige rematadores fuertes por arriba y que ataquen bien los espacios del área.' },
+      'juego interior': { who: 'att', attrs: ['control', 'asociacion', 'finalizacion', 'regate'], need: 63, space: 'intervencion+ayuda', why: 'Finalizar por dentro exige paredes y controles en espacios muy reducidos.' },
+      'llegada de segunda línea': { who: 'int', attrs: ['finalizacion', 'espacios', 'resistencia'], need: 60, space: 'cooperacion', why: 'La llegada desde segunda línea exige centrocampistas que lean el espacio libre y lleguen al área.' },
+    },
+    blockHeight: {
+      alto: { who: 'outfield', attrs: ['velocidad', 'repetir', 'resistencia', 'competitividad', 'anticipacion'], need: 64, space: 'intervencion', why: 'Presionar arriba exige muchas acciones de intervención seguidas y defender la espalda con velocidad.' },
+      medio: { who: 'outfield', attrs: ['colectivo', 'ocupacion', 'intDefensiva', 'concentracion'], need: 60, space: 'cooperacion', why: 'El bloque medio se sostiene con distancias cortas y basculaciones colectivas (cooperación).' },
+      bajo: { who: 'def', attrs: ['aereo', 'fuerza', 'concentracion', 'intDefensiva'], need: 61, space: 'intervencion+cooperacion', why: 'Defender cerca del área exige ganar duelos aéreos y no perder la concentración durante mucho tiempo.' },
+    },
+    pressType: {
+      'al hombre': { who: 'outfield', attrs: ['entrada', 'velocidad', 'intDefensiva', 'competitividad'], need: 64, space: 'intervencion', why: 'La presión al hombre convierte el partido en duelos individuales: cada jugador debe ganar su intervención.' },
+      zonal: { who: 'outfield', attrs: ['colectivo', 'ocupacion', 'concentracion', 'anticipacion'], need: 60, space: 'cooperacion', why: 'La presión zonal depende de coberturas y basculaciones coordinadas.' },
+    },
+    depthControl: {
+      'línea adelantada': { who: 'cb', attrs: ['velocidad', 'anticipacion', 'concentracion', 'aceleracion'], need: 64, space: 'ayuda', why: 'Defender adelantados exige centrales rápidos que cubran la espalda y coordinen el fuera de juego.' },
+    },
+    afterLoss: {
+      'presión inmediata': { who: 'outfield', attrs: ['repetir', 'competitividad', 'anticipacion', 'agilidad'], need: 63, space: 'intervencion+ayuda', why: 'Presionar tras pérdida exige que los cercanos al balón reaccionen al instante (intervención) y que los de alrededor cierren líneas de pase (ayuda mutua).' },
+      repliegue: { who: 'outfield', attrs: ['velocidad', 'colectivo', 'concentracion'], need: 60, space: 'cooperacion', why: 'El repliegue exige volver rápido y juntos a la estructura defensiva.' },
+    },
+    afterRecovery: {
+      contraataque: { who: 'att', attrs: ['velocidad', 'aceleracion', 'conduccion', 'finalizacion'], need: 64, space: 'intervencion', why: 'Contraatacar exige atacantes rápidos que conduzcan y finalicen con poco tiempo.' },
+      conservación: { who: 'mid', attrs: ['control', 'pase', 'percepcion'], need: 62, space: 'ayuda', why: 'Conservar tras recuperar exige un primer pase seguro fuera de la zona de presión.' },
+    },
+    cornerOf: { 'primer palo': { who: 'outfield', top: 5, attrs: ['aereo', 'fuerza'], need: 62, space: 'intervencion', why: 'Los córners al área dependen de tus mejores cabeceadores.' }, 'segundo palo': { who: 'outfield', top: 5, attrs: ['aereo', 'fuerza'], need: 62, space: 'intervencion', why: 'Los córners al área dependen de tus mejores cabeceadores.' } },
+  };
+  // Incoherencias internas entre decisiones del propio modelo (se plantean como preguntas, no como errores)
+  const MODEL_TENSIONS = [
+    [(m) => m.blockHeight === 'alto' && m.depthControl === 'línea hundida', 'Bloque alto con la última línea hundida deja un gran espacio entre líneas. ¿Cómo mantendrás las distancias entre líneas?'],
+    [(m) => m.blockHeight === 'bajo' && m.afterLoss === 'presión inmediata', 'Defiendes en bloque bajo pero quieres presionar tras pérdida. ¿En qué zonas del campo presionarás y en cuáles replegarás?'],
+    [(m) => m.afterRecovery === 'contraataque' && m.tempo === 'pausado', 'Quieres contraatacar pero tu ritmo de circulación es pausado. ¿Qué criterio decide cuándo acelerar?'],
+    [(m) => m.buildUp === 'directo' && m.pivots === 'entre centrales', 'Inicias en largo pero el pivote se incrusta entre centrales. ¿Quién disputará las segundas jugadas?'],
+    [(m) => ['1-3-2-5', '1-2-3-5'].includes(m.attStructure) && m.restDefense === '2+1', 'Atacas con cinco por delante y vigilancias 2+1. ¿Cómo protegerás las transiciones defensivas?'],
+    [(m) => m.fullbacks === 'conservadores' && +m.width >= 5, 'Pides amplitud máxima pero tus laterales son conservadores. ¿Quién ocupará los carriles exteriores?'],
+  ];
+  function groupPlayers(players, who) { return players.filter((p) => LINE_POS[who].includes(p.pos)); }
+  function validateModel(model, players) {
+    const lu = autoLineup(players, model.defStructure || '1-4-3-3');
+    const xiIds = new Set(lu.slots.filter(Boolean));
+    const checks = [];
+    for (const [field, opts] of Object.entries(MODEL_DEMANDS)) {
+      const d = opts[model[field]]; if (!d) continue;
+      let pool = groupPlayers(players, d.who);
+      const starters = pool.filter((p) => xiIds.has(p.id));
+      if (starters.length >= 2) pool = starters;
+      const val = (p) => avg(d.attrs.map((a) => p.attrs[a]));
+      let ranked = pool.map((p) => [p, val(p)]).sort((a, b) => b[1] - a[1]);
+      if (d.top) ranked = ranked.slice(0, d.top);
+      const have = round1(avg(ranked.map((x) => x[1])));
+      // relativo: ¿son estas capacidades un punto fuerte o débil de esos mismos jugadores? absoluto: ¿llegan al nivel que exige?
+      const own = round1(avg(ranked.map((x) => avg(ALL_ATTRS.map((a) => x[0].attrs[a])))));
+      const rel = have - own;
+      const fit = clamp(0.55 + (rel - 2) / 8 + (have - d.need) / 30, 0, 1);
+      const verdict = fit >= 0.7 ? 'coherente' : fit >= 0.4 ? 'riesgo' : 'incoherente';
+      const label = (Object.values(MODEL_FIELDS).flatMap((g) => g.fields).find((f) => f[0] === field) || [field, field])[1];
+      checks.push({ field, label, choice: model[field], space: d.space, need: d.need, have, own, rel: round1(rel), fit: round1(fit), verdict, why: d.why, attrs: d.attrs.map((a) => ATTR_LABEL[a]),
+        best: ranked.slice(0, 2).map((x) => `${x[0].name} (${Math.round(x[1])})`), weak: ranked.length > 2 ? ranked.slice(-1).map((x) => `${x[0].name} (${Math.round(x[1])})`) : [] });
+    }
+    const tensions = MODEL_TENSIONS.filter(([f]) => f(model)).map((x) => x[1]);
+    const spaces = squadSpaces(players);
+    const order = Object.entries(spaces).sort((a, b) => b[1].value - a[1].value);
+    const questions = [];
+    const bad = checks.filter((c) => c.verdict !== 'coherente').sort((a, b) => a.fit - b.fit);
+    for (const c of bad.filter((x) => x.fit < 0.6).slice(0, 3)) {
+      const reason = c.rel < -1 ? `es uno de sus puntos débiles (${c.have} frente a ${c.own} de nivel general)` : c.have < c.need ? `no llegan al nivel que exige (${c.have}, orientativo ${c.need})` : `no es un punto fuerte especial de ellos (${c.have})`;
+      questions.push(`«${c.choice}» en ${c.label.toLowerCase()} pide ${c.attrs.join(', ').toLowerCase()}, y para los jugadores que lo ejecutarían ${reason}. ¿Quién puede sostenerlo y cómo compensarás a los que no?`);
+    }
+    questions.push(`Tu plantilla es más fuerte en ${PHASE_SPACES[order[0][0]].label.toLowerCase()} (${order[0][1].value}) y más débil en ${PHASE_SPACES[order[2][0]].label.toLowerCase()} (${order[2][1].value}). ¿Cómo aprovecha tu modelo esa fortaleza?`);
+    const weighted = checks.reduce((s2, c) => s2 + c.fit, 0) / Math.max(1, checks.length);
+    const score = Math.round(clamp(weighted * 100 - tensions.length * 6, 0, 100));
+    return { score, verdict: score >= 70 ? 'coherente' : score >= 45 ? 'riesgo' : 'incoherente', checks, tensions, spaces, questions };
+  }
+
   /* ───────────── Biblioteca de tareas ───────────── */
   const TASK_LIBRARY = [
     { name: 'Rondo 4c2 con transición', type: 'rondo', objective: 'progPresion', attackers: 4, defenders: 2, jokers: 0, goalkeepers: 0, length: 12, width: 12, duration: 4, series: 4, pause: 1, rules: ['toques2', 'tras_perdida'], cues: 'Perfilarse antes de recibir, pase al pie lejano.', expected: 'Apoyos a ambos lados del poseedor.', success: '8 pases seguidos = punto.', variants: 'Añadir un tercer defensor.', opposition: 'si', direction: 'no', phase: 'Organización ofensiva' },
@@ -973,5 +1097,6 @@
     defaultModel, modelRelevance, genSquad, playerRating, posFit, squadPotential, strengthsWeaknesses, autoLineup, roundRobin,
     evaluateTask, evaluateSession, evaluateMicrocycle, computeLearning, evaluatePlan, evaluateCoherence, evaluateAdaptation, evaluateReflection,
     simulateMatch, tacticsFrom, taskPlayers, sessionLoad: load,
+    PHASE_SPACES, MODEL_DEMANDS, spaceValue, squadSpaces, validateModel,
   });
 })(typeof window !== 'undefined' ? window : globalThis);

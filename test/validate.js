@@ -48,7 +48,7 @@ const n=S.unlockNextRound(comp.id);assert.equal(n.number,2);assert.equal(S.getCo
 console.log('ranking',S.academicRanking(comp.id).map(r=>r.coach.name+' '+r.total).join(' | '));
 console.log('scouting',S.scouting(ms[0].awayId).facts.slice(0,2));
 // DEMO
-const demo=TCDemo.createDemo();const dt=S.teamsOf(demo.comp.id);assert.equal(dt.length,8);assert.ok(dt.every(t=>t.players.length===20));
+const demo=TCDemo.createDemo();const dt=S.teamsOf(demo.comp.id);assert.equal(dt.length,8);assert.ok(dt.every(t=>t.players.length===18));
 assert.equal(S.roundsOf(demo.comp.id).length,7);console.log('potenciales',dt.map(t=>TC.squadPotential(t.players)).join(' '));
 S.loginAs(demo.coach.id);const errs=S.validateForSubmit(demo.team,S.getDraft(demo.team.id,1));console.log('demo errs',errs);
 const me=TC.evaluateMicrocycle(S.getDraft(demo.team.id,1).microcycle,demo.team.model,{sessionsRequired:4});console.log('demo micro',me.score25,me.criteria.map(c=>c.k+':'+Math.round(c.s*100)).join(' '));
@@ -60,3 +60,24 @@ console.log('OK');
 const D=JSON.parse(store['thecoach.db.v1']);for(const k in D)console.log(k,Math.round(JSON.stringify(D[k]).length/1024));
 const m=D.matches.find(x=>x.result);for(const k in m.result)console.log(' r.'+k,Math.round(JSON.stringify(m.result[k]).length/1024));console.log(' input',Math.round(JSON.stringify(m.input).length/1024));
 const s=D.submissions[0];for(const k in s)console.log(' s.'+k,Math.round(JSON.stringify(s[k]).length/1024));
+// Flujo de acceso con aprobación
+S.logout();
+assert.throws(()=>S.adminLogin('alex@x.com','12345678'));
+const adm=S.adminSetup('Alex López','alex@x.com','supersecreto');assert.ok(adm.superadmin);
+assert.throws(()=>S.adminSetup('Otro','o@x.com','supersecreto'));
+S.logout();const stu=S.requestAccess('Pau Martí','pau@correo.com');assert.equal(stu.status,'pending');
+assert.throws(()=>S.requestAccess('Pau Martí','pau@correo.com'));
+assert.throws(()=>S.loginWithCode('pau@correo.com','AAAA-BBBB'),/pendiente/);
+S.adminLogin('alex@x.com','supersecreto');
+const comp2=S.createCompetition({name:'Liga Real',config:{teams:4}});
+assert.ok(S.myCompetitions().length>=2,'superadmin ve todas');
+const freeT=S.teamsOf(comp2.id)[0];const code=S.approveStudent(stu.id,freeT.id);assert.match(code,/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+S.logout();assert.throws(()=>S.loginWithCode('pau@correo.com','ZZZZ-ZZZZ'));
+const me2=S.loginWithCode('PAU@correo.com',code.toLowerCase());assert.equal(me2.id,stu.id);
+const tm=S.myTeams()[0];assert.equal(tm.players.length,18);
+assert.throws(()=>S.submitModel(tm.id,tm.model),/justificación/);
+S.markSquadSeen(tm.id);
+const val=S.submitModel(tm.id,Object.assign({},tm.model,{identity:'Equipo asociativo que presiona tras pérdida',notes:{ofensiva:'x'.repeat(31),defensiva:'x'.repeat(31),transAD:'x'.repeat(31),transDA:'x'.repeat(31),abp:'x'.repeat(31)}}));
+console.log('validación modelo',val.score,val.verdict,val.checks.length,'chequeos');
+S.adminLogin('alex@x.com','supersecreto');S.setStudentStatus(stu.id,'revoked');S.logout();assert.throws(()=>S.loginWithCode('pau@correo.com',code),/desactivado/);
+console.log('ACCESS OK');

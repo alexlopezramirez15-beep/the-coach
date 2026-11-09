@@ -1,4 +1,4 @@
-/* THE COACH — Modo demostración: 8 equipos, 20 jugadores, 7 jornadas a una vuelta. */
+/* THE COACH — Modo demostración: 8 equipos, 18 jugadores, 7 jornadas a una vuelta. */
 (function (G) {
   'use strict';
   const TC = G.TC, S = G.TCStore;
@@ -55,15 +55,23 @@
     const prev = d.competitions.find((c) => c.demo);
     let teacher = d.users.find((u) => u.demo === 'teacher');
     let coach = d.users.find((u) => u.demo === 'coach');
-    if (!teacher) { teacher = { id: S.uid('u'), name: 'Docente demo', role: 'teacher', demo: 'teacher', createdAt: S.now() }; d.users.push(teacher); }
-    if (!coach) { coach = { id: S.uid('u'), name: 'Entrenador/a demo', role: 'student', demo: 'coach', createdAt: S.now() }; d.users.push(coach); }
+    if (!teacher) { teacher = { id: S.uid('u'), name: 'Superadministrador demo', role: 'teacher', superadmin: true, status: 'active', demo: 'teacher', createdAt: S.now() }; d.users.push(teacher); }
+    if (!coach) { coach = { id: S.uid('u'), name: 'Entrenador/a demo', email: 'demo@thecoach.local', role: 'student', status: 'active', demo: 'coach', createdAt: S.now() }; d.users.push(coach); }
+    teacher.superadmin = true; teacher.name = 'Superadministrador demo';
+    // dos solicitudes de ejemplo para probar la aprobación
+    if (!d.users.some((u) => u.demo === 'request')) {
+      d.users.push({ id: S.uid('u'), name: 'Alumno de ejemplo 1', email: 'alumno1@ejemplo.com', role: 'student', status: 'pending', requestedAt: S.now(), demo: 'request' });
+      d.users.push({ id: S.uid('u'), name: 'Alumno de ejemplo 2', email: 'alumno2@ejemplo.com', role: 'student', status: 'pending', requestedAt: S.now(), demo: 'request' });
+    }
     d.session = { userId: teacher.id, at: S.now() };
     if (prev) S.deleteCompetition(prev.id);
     const comp = S.createCompetition({ name: 'Liga Demo Manager Academy', className: 'CFGM Técnico Deportivo en Fútbol · Nivel 2', demo: true, seed: 'demo-2026', config: { teams: 8, doubleRound: false, sessionsPerWeek: 4, difficulty: 'medio' }, teamNames: ['CF Alameda', 'UD Sierra Norte', 'CD Faro Viejo', 'Racing Valle Verde', 'Atlètic Les Torres', 'SD Ribera Baja', 'CE Molinos', 'Deportivo Cumbres'] });
     const teams = S.teamsOf(comp.id);
     teams.forEach((t, i) => { Object.assign(t.model, MODELS[i], { updatedAt: S.now() }); });
     const my = teams[0];
-    my.coachId = coach.id; my.ai = false;
+    my.coachId = coach.id; my.ai = false; my.squadSeenAt = S.now();
+    my.model.notes = { ofensiva: 'Tenemos centrales y pivote con buena salida y un interior muy asociativo: queremos atraer y superar la primera presión con tercer hombre.', defensiva: 'Presión alta tras pérdida porque los delanteros repiten esfuerzos; los centrales son rápidos para defender la espalda.', transAD: 'Los tres más cercanos presionan cinco segundos; el resto cierra líneas de pase interiores.', transDA: 'Primer pase fuera de la zona de presión para atacar rápido con los extremos.', abp: 'Dos centrales dominan el juego aéreo: córners al segundo palo.' };
+    my.model.submittedAt = S.now(); my.model.validation = TC.validateModel(my.model, my.players);
     S.save();
     // entregas de los equipos del sistema (planes completos y bloqueados)
     for (const t of teams.slice(1)) S.makeSubmission(t, 1, S.autoWeek(t, 1, 'medio'), true);

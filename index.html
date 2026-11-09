@@ -267,6 +267,20 @@ details.rub summary{display:flex;justify-content:space-between;align-items:cente
 .toast{padding:12px 14px;border-radius:8px;background:var(--panel-2);border:1px solid var(--grass-d);box-shadow:0 8px 30px rgba(0,0,0,.4);font-size:.92rem;transition:opacity .5s,transform .5s}
 .toast.bad{border-color:var(--red)}.toast.out{opacity:0;transform:translateY(8px)}
 
+.role.admin{color:var(--grass)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.tab{background:none;border:0;padding:8px 12px;color:var(--muted);font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:var(--grass);border-bottom-color:var(--grass)}
+.bigcode{font-family:var(--f-display);font-size:2.6rem;font-weight:700;letter-spacing:.18em;text-align:center;padding:14px;border-radius:8px;background:var(--navy-2);border:1px dashed var(--grass);color:var(--grass);user-select:all}
+.pl{cursor:pointer;gap:8px}.pl:hover{border-color:var(--grass-d)}
+.pl-head{display:flex;align-items:center;gap:10px}.pl-head>div{flex:1;min-width:0;display:flex;flex-direction:column}.pl-head small{color:var(--muted);font-size:.78rem}
+.pl-r{font-family:var(--f-display);font-size:1.9rem;font-weight:700;line-height:1;min-width:40px}
+.g4mini,.lines3{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.lines3{grid-template-columns:repeat(3,1fr)}
+.g4mini div,.lines3 div{background:var(--navy-2);border-radius:6px;padding:5px;text-align:center}.g4mini small,.lines3 small{display:block;font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.g4mini b,.lines3 b{font-family:var(--f-display);font-size:1.25rem}
+details.vchk{border:1px solid var(--line);border-left:3px solid var(--grass);border-radius:6px;padding:8px 10px;background:var(--navy-2)}
+details.vchk.riesgo{border-left-color:var(--amber)}details.vchk.incoherente{border-left-color:var(--red)}
+details.vchk summary{display:flex;justify-content:space-between;gap:8px;align-items:center;cursor:pointer;font-size:.9rem;flex-wrap:wrap}
+details.vchk p{margin-top:6px}
 @media (max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}.player-head{grid-template-columns:auto minmax(0,1fr)}.player-head .sw{grid-column:1/-1}.fields.f4{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:900px){
   .shell{grid-template-columns:minmax(0,1fr)}
@@ -295,4 +309,5 @@ details.rub summary{display:flex;justify-content:space-between;align-items:cente
 <script src="js/ui-coach.js"></script>
 <script src="js/ui-match.js"></script>
 <script src="js/ui-teacher.js"></script>
+<script src="js/ui-onboard.js"></script>
 <script>UI.start();</script>

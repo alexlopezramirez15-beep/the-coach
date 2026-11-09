@@ -4,7 +4,7 @@
   const TC = G.TC, S = G.TCStore, UI = G.UI, esc = UI.esc;
   const V = UI.views, A = UI.actions;
 
-  function students() { return S.users().filter((u) => u.role === 'student'); }
+  function students() { return S.users().filter((u) => u.role === 'student' && u.status !== 'pending'); }
 
   V.profe = function (c) {
     if (!c.comp) return `<div class="page-head"><h1>Panel del profesor</h1><p class="muted">Crea tu primera competición o carga la liga de demostración.</p></div>
@@ -25,7 +25,7 @@
     const studs = students();
     return `<div class="page-head"><h1>${esc(comp.name)}</h1><p class="muted">${esc(comp.className || 'Clase sin nombre')} · ${comp.config.teams} equipos · ${comp.config.rounds} jornadas ${comp.config.doubleRound ? 'a doble vuelta' : 'a una vuelta'} · ${comp.status === 'finished' ? 'Finalizada' : 'En curso'}</p></div>
     <div class="kpi-row">
-      <div class="kpi card"><small>Código de acceso</small><b class="code">${esc(comp.code)}</b><button class="btn sm ghost" data-act="copyCode" data-code="${esc(comp.code)}">Copiar</button></div>
+      <div class="kpi card"><small>Solicitudes de acceso</small><b class="${S.users().some((u) => u.status === 'pending') ? 'code' : ''}">${S.users().filter((u) => u.status === 'pending').length}</b><button class="btn sm ghost" data-go="profe-alumnos">Gestionar</button></div>
       <div class="kpi card"><small>Alumnos con equipo</small><b>${assigned.length}<i>/${teams.length}</i></b></div>
       <div class="kpi card"><small>Jornada actual</small><b>${n}<i>/${comp.config.rounds}</i></b>${UI.pill(rd.status === 'open' ? 'Abierta' : rd.status === 'played' ? 'Disputada' : 'Bloqueada', rd.status === 'open' ? 'info' : rd.status === 'played' ? 'ok' : '')}</div>
       <div class="kpi card"><small>Entregas pendientes</small><b>${pending.length}</b></div>

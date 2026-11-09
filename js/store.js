@@ -32,6 +32,79 @@
 
   /* ───────── Usuarios y sesión ───────── */
   function currentUser() { const d = load(); return d.session ? d.users.find((u) => u.id === d.session.userId) || null : null; }
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const normEmail = (e) => (e || '').trim().toLowerCase();
+  function hashCode(code, salt) { return 'h' + TC.hashSeed('tc:' + salt + ':' + String(code).trim().toUpperCase()).toString(36) + TC.hashSeed(String(code).trim().toUpperCase() + ':' + salt).toString(36); }
+  function randomCode() {
+    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let out = '';
+    const buf = new Uint32Array(8);
+    try { (G.crypto || require('crypto').webcrypto).getRandomValues(buf); } catch (e) { for (let i = 0; i < 8; i++) buf[i] = Math.floor(Math.random() * 4294967296); }
+    for (let i = 0; i < 8; i++) out += A[buf[i] % A.length];
+    return out.slice(0, 4) + '-' + out.slice(4);
+  }
+  const findByEmail = (email) => load().users.find((u) => u.email && u.email === normEmail(email));
+  // Alumno: solicita acceso con nombre y email; queda pendiente hasta que el administrador le genere un código.
+  function requestAccess(name, email) {
+    name = (name || '').trim(); email = normEmail(email);
+    if (name.length < 3) err('Escribe tu nombre y apellido.');
+    if (!EMAIL_RE.test(email)) err('Escribe un email válido.');
+    const ex = findByEmail(email);
+    if (ex && ex.status === 'pending') err('Ya hay una solicitud pendiente con este email. Espera a que tu profesor te pase el código.');
+    if (ex) err('Este email ya tiene cuenta. Entra con tu código.');
+    const u = { id: uid('u'), name, email, role: 'student', status: 'pending', requestedAt: now(), createdAt: now() };
+    load().users.push(u); addLog(null, null, 'solicitud', `${name} (${email}) solicita acceso.`); save();
+    return u;
+  }
+  function loginWithCode(email, code) {
+    const u = findByEmail(email);
+    if (!u || u.role !== 'student') err('No hay ninguna cuenta de alumno con ese email. Solicita acceso primero.');
+    if (u.status === 'pending') err('Tu solicitud está pendiente. Tu profesor te pasará el código cuando la apruebe.');
+    if (u.status === 'revoked') err('Tu acceso está desactivado. Habla con tu profesor.');
+    if (!u.codeHash || u.codeHash !== hashCode(code, u.id)) err('El código no es correcto. Revisa que lo has copiado bien (formato ABCD-EFGH).');
+    const d = load(); d.session = { userId: u.id, at: now() }; u.lastLoginAt = now(); save(); return u;
+  }
+  const realAdmin = () => load().users.find((u) => u.superadmin && !u.demo);
+  function adminExists() { return !!realAdmin(); }
+  function adminSetup(name, email, password) {
+    if (adminExists()) err('Ya existe un superadministrador.');
+    name = (name || '').trim(); email = normEmail(email);
+    if (name.length < 3) err('Escribe tu nombre.'); if (!EMAIL_RE.test(email)) err('Escribe un email válido.');
+    if ((password || '').length < 8) err('La contraseña debe tener al menos 8 caracteres.');
+    const u = { id: uid('u'), name, email, role: 'teacher', superadmin: true, status: 'active', createdAt: now() };
+    u.passHash = hashCode(password, u.id);
+    const d = load(); d.users.push(u); d.session = { userId: u.id, at: now() }; save(); return u;
+  }
+  function adminLogin(email, password) {
+    const u = findByEmail(email);
+    if (!u || u.role !== 'teacher' || !u.passHash || u.passHash !== hashCode(password, u.id)) err('Email o contraseña incorrectos.');
+    const d = load(); d.session = { userId: u.id, at: now() }; save(); return u;
+  }
+  function assertAdmin() { const u = currentUser(); if (!u || u.role !== 'teacher') err('Sólo el profesor o el superadministrador puede hacerlo.'); return u; }
+  // Aprueba la solicitud, asigna equipo y devuelve el código en claro (sólo se muestra una vez; se guarda cifrado).
+  function approveStudent(userId, teamId) {
+    const admin = assertAdmin(); const d = load();
+    const u = d.users.find((x) => x.id === userId); if (!u || u.role !== 'student') err('Solicitud no encontrada.');
+    const team = getTeam(teamId); if (!team) err('Elige un equipo libre.');
+    const comp = getComp(team.compId); if (!isOwner(admin, comp)) err('No gestionas esa competición.');
+    if (team.coachId && team.coachId !== u.id) err('Ese equipo ya tiene entrenador.');
+    if (d.teams.some((t) => t.compId === comp.id && t.coachId === u.id && t.id !== team.id)) err('Este alumno ya dirige otro equipo de esa competición.');
+    const code = randomCode();
+    u.codeHash = hashCode(code, u.id); u.status = 'active'; u.approvedAt = now(); u.approvedBy = admin.id;
+    team.coachId = u.id; team.ai = false;
+    addLog(comp.id, team.id, 'alta', `${admin.name} aprueba a ${u.name} y le asigna ${team.name}.`);
+    save(); return code;
+  }
+  function regenerateCode(userId) {
+    const admin = assertAdmin(); const u = load().users.find((x) => x.id === userId); if (!u || u.role !== 'student') err('Alumno no encontrado.');
+    const code = randomCode(); u.codeHash = hashCode(code, u.id); if (u.status === 'revoked') u.status = 'active';
+    addLog(null, null, 'acceso', `${admin.name} genera un nuevo código para ${u.name}.`); save(); return code;
+  }
+  function setStudentStatus(userId, status) {
+    const admin = assertAdmin(); const d = load(); const u = d.users.find((x) => x.id === userId); if (!u) err('Alumno no encontrado.');
+    if (status === 'rejected') { d.users = d.users.filter((x) => x.id !== userId); addLog(null, null, 'acceso', `${admin.name} rechaza la solicitud de ${u.name}.`); save(); return; }
+    u.status = status; if (d.session && d.session.userId === u.id) d.session = null;
+    addLog(null, null, 'acceso', `${admin.name} ${status === 'revoked' ? 'desactiva' : 'reactiva'} a ${u.name}.`); save();
+  }
   function register(name, role) {
     name = (name || '').trim();
     if (name.length < 2) err('Escribe un nombre de al menos 2 letras.');
@@ -45,7 +118,7 @@
   function logout() { const d = load(); d.session = null; save(); }
 
   /* ───────── Permisos ───────── */
-  function isOwner(user, comp) { return user && comp && user.role === 'teacher' && comp.ownerId === user.id; }
+  function isOwner(user, comp) { return !!(user && comp && user.role === 'teacher' && (user.superadmin || comp.ownerId === user.id)); }
   function canEditTeam(user, team) { return !!(user && team && team.coachId === user.id); }
   function assertTeam(team) { const u = currentUser(); if (!canEditTeam(u, team)) err('Sólo el entrenador de este equipo puede modificarlo.'); return u; }
   function assertOwner(comp) { const u = currentUser(); if (!isOwner(u, comp)) err('Sólo el profesor de esta competición puede hacerlo.'); return u; }
@@ -58,7 +131,7 @@
   const matchesOf = (compId, round) => load().matches.filter((m) => m.compId === compId && (round == null || m.round === round));
   const getMatch = (id) => load().matches.find((m) => m.id === id);
   function myTeams(user) { user = user || currentUser(); return user ? load().teams.filter((t) => t.coachId === user.id) : []; }
-  function myCompetitions(user) { user = user || currentUser(); if (!user) return []; const d = load(); return user.role === 'teacher' ? d.competitions.filter((c) => c.ownerId === user.id) : d.competitions.filter((c) => d.teams.some((t) => t.compId === c.id && t.coachId === user.id)); }
+  function myCompetitions(user) { user = user || currentUser(); if (!user) return []; const d = load(); return user.role === 'teacher' ? d.competitions.filter((c) => user.superadmin || c.ownerId === user.id) : d.competitions.filter((c) => d.teams.some((t) => t.compId === c.id && t.coachId === user.id)); }
   function nextMatch(team) {
     const comp = getComp(team.compId);
     const ms = matchesOf(team.compId).filter((m) => (m.homeId === team.id || m.awayId === team.id) && m.status !== 'played').sort((a, b) => a.round - b.round);
@@ -146,10 +219,26 @@
   }
   function saveModel(teamId, model) {
     const team = getTeam(teamId); assertTeam(team);
-    team.model = Object.assign(TC.defaultModel(), model, { updatedAt: now() });
+    team.model = Object.assign(TC.defaultModel(), model, { updatedAt: now(), submittedAt: team.model.submittedAt || null, validation: team.model.validation || null });
     team.modelVersions = (team.modelVersions || []).concat([{ at: now(), model: clone(team.model) }]).slice(-20);
     addLog(team.compId, team.id, 'modelo', 'Modelo de juego guardado.');
     save(); return team.model;
+  }
+  function markSquadSeen(teamId) { const team = getTeam(teamId); assertTeam(team); if (!team.squadSeenAt) { team.squadSeenAt = now(); addLog(team.compId, team.id, 'plantilla', 'Ha revisado la presentación de su plantilla.'); save(); } }
+  // Presentar el modelo: exige justificación y guarda la validación contra la plantilla real
+  function submitModel(teamId, model) {
+    const team = getTeam(teamId); assertTeam(team);
+    const m = Object.assign(TC.defaultModel(), model);
+    const missing = [];
+    if ((m.identity || '').trim().length < 15) missing.push('la identidad del equipo');
+    for (const [k, g] of Object.entries(TC.MODEL_FIELDS)) if (((m.notes || {})[k] || '').trim().length < 30) missing.push('la justificación de ' + g.label.toLowerCase());
+    if (missing.length) err('Para presentar el modelo falta:\n• ' + missing.join('\n• ') + '\n(mínimo 30 caracteres por fase, pensando en tus jugadores).');
+    const validation = TC.validateModel(m, team.players);
+    m.updatedAt = now(); m.submittedAt = now(); m.validation = validation;
+    team.model = m;
+    team.modelVersions = (team.modelVersions || []).concat([{ at: now(), model: clone(m), submitted: true }]).slice(-20);
+    addLog(team.compId, team.id, 'modelo', `Modelo de juego presentado (validación ${validation.score}/100).`);
+    save(); return validation;
   }
   function saveBoards(teamId, boards) { const team = getTeam(teamId); assertTeam(team); team.boards = boards; save(); }
   function saveCustomTask(teamId, task) {
@@ -526,6 +615,7 @@
   G.TCStore = {
     load, save, uid, now, clone, err,
     currentUser, register, loginAs, logout, users: () => load().users,
+    requestAccess, loginWithCode, adminExists, adminSetup, adminLogin, approveStudent, regenerateCode, setStudentStatus, markSquadSeen, submitModel,
     isOwner, canEditTeam,
     getComp, getTeam, teamsOf, roundsOf, roundOf, matchesOf, getMatch, myTeams, myCompetitions, nextMatch, lastSubmission,
     createCompetition, updateConfig, joinWithCode, assignTeam, freeTeams, deleteCompetition,
