@@ -118,7 +118,7 @@
   ];
   const TEACHER_NAV = [
     ['Clase', [['profe', 'Panel del profesor'], ['profe-directo', 'Partido en directo'], ['profe-alumnos', 'Alumnos y accesos'], ['profe-jornadas', 'Jornadas'], ['profe-entregas', 'Entregas'], ['profe-evaluar', 'Evaluaciones']]],
-    ['Competición', [['clasificacion', 'Clasificación'], ['ranking', 'Ranking académico'], ['profe-jugadores', 'Jugadores'], ['profe-config', 'Configuración']]],
+    ['Competición', [['clasificacion', 'Clasificación'], ['ranking', 'Ranking académico'], ['profe-jugadores', 'Jugadores'], ['profe-config', 'Configuración'], ['nueva-comp', 'Nueva competición']]],
     ['Proyecto', [['estado', 'Estado del desarrollo']]],
   ];
 
