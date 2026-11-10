@@ -5,6 +5,7 @@ cd "$(dirname "$0")"
 rm -rf dist
 mkdir -p dist/js
 cp js/*.js dist/js/
+cp favicon.svg favicon-32.png apple-touch-icon.png dist/
 { printf '<!doctype html>\n<html lang="es">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
   sed -n '1,/<\/style>/p' index.html
   printf '</head>\n<body>\n'

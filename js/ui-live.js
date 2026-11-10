@@ -108,12 +108,12 @@
     document.querySelectorAll('[data-liveclock]').forEach((el) => { el.textContent = clk.minute + "'"; });
     document.querySelectorAll('[data-liveleft]').forEach((el) => { el.textContent = mmss(clk.left); });
     document.querySelectorAll('[data-noteleft]').forEach((el) => { const end = +el.dataset.noteleft; if (end) el.textContent = 'Quedan ' + mmss((end - Date.now()) / 1000); });
-    if (c.user.role === 'teacher' && Date.now() - lastTick > 4000) {
+    if ((c.user.role === 'teacher' || c.user.viewer) && Date.now() - lastTick > 4000) {
       lastTick = Date.now();
       let ch = false; try { ch = S.liveTick(c.comp.id); } catch (e) { console.error(e); }
       if (ch && !typing()) { const y = window.scrollY; UI.render(); window.scrollTo(0, y); }
     }
-    if (c.user.role === 'student' && c.team) {
+    if (c.user.role === 'student' && c.team && !c.user.viewer) {
       const n = ((rd.live.notes || {})[c.team.id] || []).length;
       if (UI._liveNotes != null && n > UI._liveNotes) { UI.toast('📣 Nueva nota del banquillo: responde antes de que se acabe el tiempo.'); if (!typing()) { const y = window.scrollY; UI.render(); window.scrollTo(0, y); } }
       UI._liveNotes = n;

@@ -104,6 +104,15 @@
       const comp = team ? S.getComp(team.compId) : null;
       return { user, teams, team, comp };
     }
+    // Superadministrador viendo el panel de un alumno (solo lectura)
+    if (UI.state.viewAs) {
+      const team = S.getTeam(UI.state.viewAs);
+      if (team && S.myCompetitions(user).some((x) => x.id === team.compId)) {
+        const coach = S.users().find((u) => u.id === team.coachId);
+        return { user: Object.assign({}, user, { role: 'student', noGates: true, viewer: true, viewing: coach ? coach.name : 'Equipo del sistema' }), teams: [team], team, comp: S.getComp(team.compId), viewer: true };
+      }
+      UI.state.viewAs = null;
+    }
     const comps = S.myCompetitions(user);
     let comp = comps.find((c) => c.id === UI.state.compId) || comps[comps.length - 1] || null;
     UI.state.compId = comp && comp.id;
@@ -170,11 +179,13 @@
       </header>
       <div class="shell ${view === 'espera' ? 'nonav' : ''}">
         ${navHtml ? `<nav class="side" aria-label="Navegación">${navHtml}</nav>` : ''}
-        <main id="main" class="main view-${view}">${UI.liveBanner ? UI.liveBanner(c, view) : ''}${body}</main>
+        <main id="main" class="main view-${view}">${c.viewer ? `<div class="viewer-banner"><span>👁 Estás viendo el panel de <b>${esc(c.user.viewing)}</b> (${esc(c.team.name)}) tal y como lo ve el alumno. Solo lectura.</span><button class="btn sm" data-act="exitViewAs">Volver a mi panel</button></div>` : ''}${UI.liveBanner ? UI.liveBanner(c, view) : ''}${body}</main>
       </div>`;
     if (UI.after[view]) { try { UI.after[view](c, UI.state.params); } catch (e) { console.error(e); } }
   };
   UI.after = UI.after || {};
+  UI.actions.viewAs = (el) => { UI.state.viewAs = el.dataset.team; UI.state.view = 'inicio'; UI.go('inicio'); };
+  UI.actions.exitViewAs = () => { const t = S.getTeam(UI.state.viewAs); UI.state.viewAs = null; if (t) UI.state.compId = t.compId; UI.go('profe-alumnos'); };
   UI.actions.switchComp = (el) => { UI.state.compId = el.value; UI.render(); };
   UI.actions.switchTeam = (el) => { UI.state.teamId = el.value; UI.render(); };
   UI.actions.switchProfile = async () => {
@@ -182,7 +193,7 @@
     if (G.TCSync && G.TCSync.demo) { S.logout(); G.TCSync.leaveDemo(); }
     else if (Y()) await G.TCSync.logout();
     else S.logout();
-    UI.state.view = null; UI.state.teamId = null; UI.state.compId = null; UI.render();
+    UI.state.view = null; UI.state.teamId = null; UI.state.compId = null; UI.state.viewAs = null; UI.render();
   };
 
   /* ───── Acceso ───── */

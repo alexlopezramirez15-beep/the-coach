@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 0 72 72" role="img" aria-label="THE COACH">
+      <defs><linearGradient id="lg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16406e"/><stop offset="1" stop-color="#0b2240"/></linearGradient>
+      <marker id="lg1a" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3ddc84"/></marker></defs>
+      <path d="M32 2L60 10V34C60 52 47.5 63.5 32 70C16.5 63.5 4 52 4 34V10Z" fill="url(#lg1)"/>
+      <path d="M32 7.5L55 14V34C55 49 45 58.5 32 64C19 58.5 9 49 9 34V14Z" fill="none" stroke="#3ddc84" stroke-width="1.6" opacity=".85"/>
+      <path d="M9 36H55" stroke="#ffffff" stroke-opacity=".18" stroke-width="1.2"/><circle cx="32" cy="36" r="7" fill="none" stroke="#ffffff" stroke-opacity=".18" stroke-width="1.2"/>
+      <path d="M17 44l7 7M24 44l-7 7" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+      <path d="M23 41C23 27 32 22 41 22.5" fill="none" stroke="#3ddc84" stroke-width="2.6" stroke-dasharray="4 3.2" stroke-linecap="round" marker-end="url(#lg1a)"/>
+      <circle cx="46" cy="22.5" r="4.6" fill="#ffffff"/><path d="M46 19.6l1.9 1.4-.7 2.2h-2.4l-.7-2.2z" fill="#0b2240"/>
+    </svg>
