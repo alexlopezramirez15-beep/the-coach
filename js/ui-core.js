@@ -114,12 +114,10 @@
     ['Competición', [['inicio', 'Inicio'], ['directo', 'Partido en directo'], ['partido', 'Centro de partido'], ['clasificacion', 'Clasificación'], ['ranking', 'Ranking de entrenadores'], ['historial', 'Historial']]],
     ['Mi equipo', [['presentacion', 'Presentación de plantilla'], ['club', 'Historia del club'], ['equipo', 'Mi equipo'], ['plantilla', 'Plantilla'], ['modelo', 'Modelo de juego'], ['pizarra', 'Pizarra táctica']]],
     ['Semana', [['semana', 'Resumen de la semana'], ['rival', 'Rival'], ['scouting', 'Informe del rival'], ['plan', 'Plan de partido'], ['microciclo', 'Microciclo semanal'], ['alineacion', 'Once titular'], ['individual', 'Trabajo individual']]],
-    ['Proyecto', [['estado', 'Estado del desarrollo']]],
   ];
   const TEACHER_NAV = [
     ['Clase', [['profe', 'Panel del profesor'], ['profe-directo', 'Partido en directo'], ['profe-alumnos', 'Alumnos y accesos'], ['profe-jornadas', 'Jornadas'], ['profe-entregas', 'Entregas'], ['profe-evaluar', 'Evaluaciones']]],
     ['Competición', [['clasificacion', 'Clasificación'], ['ranking', 'Ranking académico'], ['profe-jugadores', 'Jugadores'], ['profe-config', 'Configuración'], ['nueva-comp', 'Nueva competición']]],
-    ['Proyecto', [['estado', 'Estado del desarrollo']]],
   ];
 
   UI.render = function () {
