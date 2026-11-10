@@ -125,7 +125,7 @@
     ['Semana', [['semana', 'Resumen de la semana'], ['rival', 'Rival'], ['scouting', 'Informe del rival'], ['plan', 'Plan de partido'], ['microciclo', 'Microciclo semanal'], ['alineacion', 'Once titular'], ['individual', 'Trabajo individual']]],
   ];
   const TEACHER_NAV = [
-    ['Clase', [['profe', 'Panel del profesor'], ['profe-directo', 'Partido en directo'], ['profe-alumnos', 'Alumnos y accesos'], ['profe-jornadas', 'Jornadas'], ['profe-entregas', 'Entregas'], ['profe-evaluar', 'Evaluaciones']]],
+    ['Clase', [['profe', 'Panel del profesor'], ['profe-directo', 'Partido en directo'], ['ver-alumno', 'Ver como alumno'], ['profe-alumnos', 'Alumnos y accesos'], ['profe-jornadas', 'Jornadas'], ['profe-entregas', 'Entregas'], ['profe-evaluar', 'Evaluaciones']]],
     ['Competición', [['clasificacion', 'Clasificación'], ['ranking', 'Ranking académico'], ['profe-jugadores', 'Jugadores'], ['profe-config', 'Configuración'], ['nueva-comp', 'Nueva competición']]],
   ];
 
@@ -179,12 +179,19 @@
       </header>
       <div class="shell ${view === 'espera' ? 'nonav' : ''}">
         ${navHtml ? `<nav class="side" aria-label="Navegación">${navHtml}</nav>` : ''}
-        <main id="main" class="main view-${view}">${c.viewer ? `<div class="viewer-banner"><span>👁 Estás viendo el panel de <b>${esc(c.user.viewing)}</b> (${esc(c.team.name)}) tal y como lo ve el alumno. Solo lectura.</span><button class="btn sm" data-act="exitViewAs">Volver a mi panel</button></div>` : ''}${UI.liveBanner ? UI.liveBanner(c, view) : ''}${body}</main>
+        <main id="main" class="main view-${view}">${c.viewer ? `<div class="viewer-banner"><span>👁 Vista de alumno: <b>${esc(c.team.name)}</b> (${esc(c.user.viewing)}). Así lo ve el alumno. Solo lectura.</span><span class="row wrap"><select class="mini" data-change="viewAsSwitch" aria-label="Equipo">${S.teamsOf(c.comp.id).map((t) => UI.opt(t.id, t.name, c.team.id)).join('')}</select><button class="btn sm" data-act="exitViewAs">Volver a mi panel</button></span></div>` : ''}${UI.liveBanner ? UI.liveBanner(c, view) : ''}${body}</main>
       </div>`;
     if (UI.after[view]) { try { UI.after[view](c, UI.state.params); } catch (e) { console.error(e); } }
   };
   UI.after = UI.after || {};
   UI.actions.viewAs = (el) => { UI.state.viewAs = el.dataset.team; UI.state.view = 'inicio'; UI.go('inicio'); };
+  UI.actions.viewAsSwitch = (el) => { UI.state.viewAs = el.value; UI.render(); };
+  UI.views['ver-alumno'] = function (c) {
+    if (!c.comp) return '<div class="card"><p>Crea primero una competición.</p></div>';
+    const teams = S.teamsOf(c.comp.id);
+    return `<div class="page-head"><h1>Ver como alumno</h1><p class="muted">Abre el panel de cualquier equipo de «${esc(c.comp.name)}» exactamente como lo ve el alumno, sin registrarte. Úsalo para guiarles en clase o para ver qué ha hecho cada uno. Es solo lectura.</p></div>
+      <div class="grid g3">${teams.map((t) => { const u = S.users().find((x) => x.id === t.coachId); return `<button class="card pick-team" data-act="viewAs" data-team="${t.id}">${UI.teamBadge(t, 44)}<span><b>${esc(t.name)}</b><small class="muted">${esc(u ? u.name : 'Sin alumno (equipo del sistema)')}</small></span></button>`; }).join('')}</div>`;
+  };
   UI.actions.exitViewAs = () => { const t = S.getTeam(UI.state.viewAs); UI.state.viewAs = null; if (t) UI.state.compId = t.compId; UI.go('profe-alumnos'); };
   UI.actions.switchComp = (el) => { UI.state.compId = el.value; UI.render(); };
   UI.actions.switchTeam = (el) => { UI.state.teamId = el.value; UI.render(); };
