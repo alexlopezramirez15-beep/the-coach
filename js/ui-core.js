@@ -161,7 +161,7 @@
     }
     const allowed = nav.flatMap((g) => g[1].map((x) => x[0])).concat(['jugador', 'tarea', 'biblioteca', 'informe', 'espera', 'nueva-comp', 'profe-entrega', 'profe-alumno', 'logros']);
     if (!view || !allowed.includes(view) || !UI.views[view]) view = c.user.role === 'teacher' ? 'profe' : 'inicio';
-    if (c.user.role === 'teacher' && !c.comp && !['profe', 'nueva-comp', 'estado', 'profe-alumnos', 'profe-alumno'].includes(view)) view = 'profe';
+    if (c.user.role === 'teacher' && !c.comp && !['profe', 'nueva-comp', 'estado', 'profe-alumnos', 'profe-alumno', 'ver-alumno'].includes(view)) view = 'profe';
     UI.state.view = view;
     let body;
     try { body = UI.views[view](c, UI.state.params); }
@@ -179,7 +179,7 @@
       </header>
       <div class="shell ${view === 'espera' ? 'nonav' : ''}">
         ${navHtml ? `<nav class="side" aria-label="Navegación">${navHtml}</nav>` : ''}
-        <main id="main" class="main view-${view}">${c.viewer ? `<div class="viewer-banner"><span>👁 Vista de alumno: <b>${esc(c.team.name)}</b> (${esc(c.user.viewing)}). Así lo ve el alumno. Solo lectura.</span><span class="row wrap"><select class="mini" data-change="viewAsSwitch" aria-label="Equipo">${S.teamsOf(c.comp.id).map((t) => UI.opt(t.id, t.name, c.team.id)).join('')}</select><button class="btn sm" data-act="exitViewAs">Volver a mi panel</button></span></div>` : ''}${UI.liveBanner ? UI.liveBanner(c, view) : ''}${body}</main>
+        <main id="main" class="main view-${view}">${UI.state.mock && c.user.demo === 'coach' ? `<div class="viewer-banner mock"><span>🧪 <b>Alumno ficticio</b> en una liga de prueba: puedes tocarlo todo, no afecta a tus alumnos.</span><span class="row wrap"><button class="btn sm ghost" data-act="mockStudent" data-fresh="1">Empezar de cero</button><button class="btn sm" data-act="mockExit">Volver a mi panel</button></span></div>` : ''}${c.viewer ? `<div class="viewer-banner"><span>👁 Vista de alumno: <b>${esc(c.team.name)}</b> (${esc(c.user.viewing)}). Así lo ve el alumno. Solo lectura.</span><span class="row wrap"><select class="mini" data-change="viewAsSwitch" aria-label="Equipo">${S.teamsOf(c.comp.id).map((t) => UI.opt(t.id, t.name, c.team.id)).join('')}</select><button class="btn sm" data-act="exitViewAs">Volver a mi panel</button></span></div>` : ''}${UI.liveBanner ? UI.liveBanner(c, view) : ''}${body}</main>
       </div>`;
     if (UI.after[view]) { try { UI.after[view](c, UI.state.params); } catch (e) { console.error(e); } }
   };
@@ -187,11 +187,24 @@
   UI.actions.viewAs = (el) => { UI.state.viewAs = el.dataset.team; UI.state.view = 'inicio'; UI.go('inicio'); };
   UI.actions.viewAsSwitch = (el) => { UI.state.viewAs = el.value; UI.render(); };
   UI.views['ver-alumno'] = function (c) {
-    if (!c.comp) return '<div class="card"><p>Crea primero una competición.</p></div>';
-    const teams = S.teamsOf(c.comp.id);
-    return `<div class="page-head"><h1>Ver como alumno</h1><p class="muted">Abre el panel de cualquier equipo de «${esc(c.comp.name)}» exactamente como lo ve el alumno, sin registrarte. Úsalo para guiarles en clase o para ver qué ha hecho cada uno. Es solo lectura.</p></div>
+    const teams = c.comp ? S.teamsOf(c.comp.id) : [];
+    const mock = `<section class="card mock-card"><div><h2>Alumno ficticio</h2><p class="muted">Una liga inventada solo para ti, con un alumno de prueba. Puedes pulsar y rellenar todo como si fueras un alumno (plantilla, DAFO, modelo, semana…) para enseñarles cómo funciona. No se registra nadie y no afecta a tus ligas ni a tus alumnos.</p></div>
+      <div class="row wrap"><button class="btn primary" data-act="mockStudent" data-fresh="1">Empezar como alumno nuevo</button><button class="btn" data-act="mockStudent">Alumno con el modelo ya hecho</button></div></section>`;
+    if (!c.comp) return `<div class="page-head"><h1>Ver como alumno</h1></div>${mock}`;
+    return `<div class="page-head"><h1>Ver como alumno</h1></div>${mock}<h2 class="sec">Paneles reales de tu liga (solo lectura)</h2><p class="muted">Abre el panel de cualquier equipo de «${esc(c.comp.name)}» exactamente como lo ve el alumno, sin registrarte. Úsalo para guiarles en clase o para ver qué ha hecho cada uno. Es solo lectura.</p>
       <div class="grid g3">${teams.map((t) => { const u = S.users().find((x) => x.id === t.coachId); return `<button class="card pick-team" data-act="viewAs" data-team="${t.id}">${UI.teamBadge(t, 44)}<span><b>${esc(t.name)}</b><small class="muted">${esc(u ? u.name : 'Sin alumno (equipo del sistema)')}</small></span></button>`; }).join('')}</div>`;
   };
+  // Alumno ficticio: liga demo local; al salir se vuelve al panel del superadministrador
+  UI.actions.mockStudent = (el) => {
+    UI.state.mock = true; ensureDemo();
+    const u = S.users().find((x) => x.demo === 'coach');
+    if (el && el.dataset.fresh) {
+      const t = S.load().teams.find((x) => x.coachId === u.id);
+      if (t) { t.squadSeenAt = null; t.model = TC.defaultModel(); t.modelVersions = []; const d = S.load(); for (const k of Object.keys(d.drafts)) if (k.startsWith(t.id + ':')) delete d.drafts[k]; S.save(); }
+    }
+    S.loginAs(u.id); UI.state.teamId = null; UI.go(el && el.dataset.fresh ? 'presentacion' : 'inicio');
+  };
+  UI.actions.mockExit = () => { UI.state.mock = false; S.logout(); if (G.TCSync && G.TCSync.demo) G.TCSync.leaveDemo(); UI.state.view = null; UI.state.teamId = null; UI.go('ver-alumno'); };
   UI.actions.exitViewAs = () => { const t = S.getTeam(UI.state.viewAs); UI.state.viewAs = null; if (t) UI.state.compId = t.compId; UI.go('profe-alumnos'); };
   UI.actions.switchComp = (el) => { UI.state.compId = el.value; UI.render(); };
   UI.actions.switchTeam = (el) => { UI.state.teamId = el.value; UI.render(); };
