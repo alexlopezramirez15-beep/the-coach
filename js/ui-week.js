@@ -84,7 +84,7 @@
         ${TC.SCOUT_MOMENTS.filter((x) => x[2] === ph).map(([k, l]) => { const mo = sc.moments[k] || {}; return `<div class="moment scout-m"><h4>${esc(l)}</h4>
           <div class="scout-grid"><div class="scout-rep"><span class="eyebrow">Lo que dice el informe</span><p>${esc(rep.moments[k])}</p></div>
           <div class="stack"><label class="field"><span>Lo que observo o confirmo</span><textarea rows="2" data-change="scMoment" data-k="${k}" data-f="obs" ${dis}>${esc(mo.obs)}</textarea></label>
-          <label class="field"><span>Cómo lo aprovechamos o neutralizamos</span><textarea rows="3" data-change="scMoment" data-k="${k}" data-f="plan" ${dis}>${esc(mo.plan)}</textarea></label></div></div></div>`; }).join('')}</section>`).join('')}
+          <label class="field"><span>Cómo lo aprovechamos o neutralizamos</span><textarea rows="3" data-change="scMoment" data-k="${k}" data-f="plan" ${dis}>${esc(mo.plan)}</textarea></label>${UI.drill.slot('w:scouting.moments.' + k + '.board', mo.board, w.editable, 'Dibujarlo en la pizarra')}</div></div></div>`; }).join('')}</section>`).join('')}
       <div class="row end"><button class="btn primary" data-go="plan">Siguiente: plan de partido →</button></div>`;
   };
   A.scTop = (el) => { const w = UI.week(UI.ctx()); save(w, (d) => { d.scouting[el.dataset.k] = el.value; }); };
@@ -110,7 +110,7 @@
       <section class="card"><h2 class="phase-t">Tareas</h2>
         ${iv.tasks.map((t, i) => `<div class="moment"><div class="entry-h"><b>Tarea ${i + 1}</b>${w.editable && iv.tasks.length > 1 ? `<button type="button" class="icon" data-act="ivTaskDel" data-i="${i}" aria-label="Quitar tarea">×</button>` : ''}</div>
           <div class="fields"><label class="field"><span>Nombre</span><input data-change="ivTask" data-i="${i}" data-k="name" value="${esc(t.name)}" ${dis}></label><label class="field"><span>Duración (min)</span><input type="number" min="5" max="90" data-change="ivTask" data-i="${i}" data-k="dur" value="${t.dur}" ${dis}></label></div>
-          <label class="field"><span>Descripción: organización, normas, series y repeticiones, y qué debe corregir el jugador</span><textarea rows="3" data-change="ivTask" data-i="${i}" data-k="desc" ${dis}>${esc(t.desc)}</textarea></label></div>`).join('')}
+          <label class="field"><span>Descripción: organización, normas, series y repeticiones, y qué debe corregir el jugador</span><textarea rows="3" data-change="ivTask" data-i="${i}" data-k="desc" ${dis}>${esc(t.desc)}</textarea></label>${UI.drill.slot('w:individual.tasks.' + i + '.board', t.board, w.editable, 'Dibujar la tarea')}</div>`).join('')}
         ${w.editable ? '<button type="button" class="btn sm ghost add-entry" data-act="ivTaskAdd">+ Añadir tarea</button>' : ''}</section>
       <section class="card"><h2 class="phase-t">Planificación y evaluación</h2>
         <fieldset class="field"><legend>Días del microciclo en los que lo hará</legend><div class="pick">${days.map((d) => `<label class="pchip"><input type="checkbox" data-change="ivDay" value="${esc(d)}" ${(iv.days || []).includes(d) ? 'checked' : ''} ${dis}><span>${esc(d)}</span></label>`).join('')}</div></fieldset>
